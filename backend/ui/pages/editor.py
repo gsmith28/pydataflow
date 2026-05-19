@@ -350,6 +350,18 @@ async def _render_editor(base_path: str) -> None:
     ui.add_head_html(_DRAWFLOW_CSS)
     ui.add_head_html(_DRAWFLOW_INIT_JS)
 
+    # Override NiceGUI/Quasar page wrapper so we can control the full viewport ourselves.
+    # q-page-container adds padding-top equal to the header height;
+    # q-page sets min-height but not height, so height:100% on children resolves to zero.
+    ui.add_head_html("""
+    <style>
+      html, body { height: 100vh; overflow: hidden; margin: 0; padding: 0; }
+      .q-page-container { padding: 0 !important; }
+      .q-page { padding: 0 !important; min-height: 0 !important;
+                height: 100vh !important; overflow: hidden !important; }
+    </style>
+    """)
+
     storage = app.storage.user
     if "workflow" not in storage:
         storage["workflow"] = Workflow(name="New Workflow").model_dump()
@@ -364,153 +376,187 @@ async def _render_editor(base_path: str) -> None:
     def save_wf(wf: Workflow) -> None:
         storage["workflow"] = wf.model_dump()
 
-    # ── Top bar ──────────────────────────────────────────────────────────────
-    with ui.header().classes("bg-slate-800 text-white items-center px-4 py-2 gap-3"):
-        ui.label("PyDataFlow").classes("text-lg font-bold text-blue-300")
-        ui.separator().props("vertical").classes("opacity-30")
+    # ── Full-viewport column ──────────────────────────────────────────────────
+    # Avoids ui.header() which causes q-page-container to add padding-top,
+    # breaking height:100% on children.
+    with ui.column().classes("w-full").style("height:100vh; gap:0; overflow:hidden;"):
 
-        name_input = ui.input(value=get_wf().name).classes("bg-slate-700 text-white rounded px-2 w-48").props("dense borderless")
+        # ── Top bar (52 px, never shrinks) ────────────────────────────────────
+        with ui.row().classes("w-full items-center bg-slate-800 text-white px-4 gap-3").style(
+            "height:52px; min-height:52px; flex-shrink:0; z-index:100;"
+        ):
+            ui.label("PyDataFlow").classes("text-lg font-bold text-blue-300")
+            ui.separator().props("vertical").classes("opacity-30")
 
-        async def on_name_change(e):
-            wf = get_wf()
-            wf.name = e.value
-            save_wf(wf)
+            name_input = ui.input(value=get_wf().name).classes(
+                "bg-slate-700 text-white rounded px-2 w-48"
+            ).props("dense borderless")
 
-        name_input.on("update:model-value", on_name_change)
+            async def on_name_change(e):
+                wf = get_wf()
+                wf.name = e.value
+                save_wf(wf)
 
-        ui.space()
+            name_input.on("update:model-value", on_name_change)
+            ui.space()
 
-        async def new_workflow():
-            wf = Workflow(name="New Workflow")
-            save_wf(wf)
-            storage["selected_node_id"] = None
-            storage["run_result"] = None
-            await ui.run_javascript("pfClearCanvas()")
-            right_panel.refresh()
-            ui.notify("New workflow created", type="info")
+            async def new_workflow():
+                wf = Workflow(name="New Workflow")
+                save_wf(wf)
+                storage["selected_node_id"] = None
+                storage["run_result"] = None
+                await ui.run_javascript("pfClearCanvas()")
+                right_panel.refresh()
+                ui.notify("New workflow created", type="info")
 
-        async def open_dialog():
-            workflows = await list_workflows()
-            with ui.dialog() as dlg, ui.card().classes("min-w-96"):
-                ui.label("Open Workflow").classes("text-lg font-bold mb-2")
-                if not workflows:
-                    ui.label("No saved workflows.").classes("text-gray-500")
-                else:
-                    for w in workflows:
-                        with ui.row().classes("w-full items-center justify-between"):
-                            ui.label(w["name"]).classes("flex-1")
-                            ui.label(w["updated_at"][:10]).classes("text-xs text-gray-400")
+            async def open_dialog():
+                workflows = await list_workflows()
+                with ui.dialog() as dlg, ui.card().classes("min-w-96"):
+                    ui.label("Open Workflow").classes("text-lg font-bold mb-2")
+                    if not workflows:
+                        ui.label("No saved workflows.").classes("text-gray-500")
+                    else:
+                        for w in workflows:
+                            with ui.row().classes("w-full items-center justify-between"):
+                                ui.label(w["name"]).classes("flex-1")
+                                ui.label(w["updated_at"][:10]).classes("text-xs text-gray-400")
 
-                            async def load(wid=w["workflow_id"]):
-                                loaded = await get_workflow(wid)
-                                if loaded:
-                                    save_wf(loaded)
-                                    storage["selected_node_id"] = None
-                                    wf_data = loaded.model_dump()
-                                    await ui.run_javascript(f"pfLoadWorkflow({json.dumps(wf_data)})")
-                                    name_input.value = loaded.name
-                                    right_panel.refresh()
-                                    dlg.close()
-                                    ui.notify(f"Loaded: {loaded.name}", type="positive")
+                                async def load(wid=w["workflow_id"]):
+                                    loaded = await get_workflow(wid)
+                                    if loaded:
+                                        save_wf(loaded)
+                                        storage["selected_node_id"] = None
+                                        wf_data = loaded.model_dump()
+                                        await ui.run_javascript(f"pfLoadWorkflow({json.dumps(wf_data)})")
+                                        name_input.value = loaded.name
+                                        right_panel.refresh()
+                                        dlg.close()
+                                        ui.notify(f"Loaded: {loaded.name}", type="positive")
 
-                            ui.button("Open", on_click=load).props("flat dense color=blue")
-                ui.button("Cancel", on_click=dlg.close).props("flat")
-            dlg.open()
+                                ui.button("Open", on_click=load).props("flat dense color=blue")
+                    ui.button("Cancel", on_click=dlg.close).props("flat")
+                dlg.open()
 
-        async def save_wf_to_db():
-            wf = get_wf()
-            saved = await save_workflow(wf)
-            save_wf(saved)
-            ui.notify("Saved", type="positive")
+            async def save_wf_to_db():
+                wf = get_wf()
+                saved = await save_workflow(wf)
+                save_wf(saved)
+                ui.notify("Saved", type="positive")
 
-        async def run_all():
-            wf = get_wf()
-            with ui.notification("Running workflow…", spinner=True, timeout=None) as n:
-                result = execute_workflow(
-                    wf,
-                    project_dir=Path(base_path),
-                    temp_dir=Path("/tmp/pydataflow"),
-                    preview_limit=50,
-                )
-                await save_run(result)
-                storage["run_result"] = result.model_dump()
-                for node_id, port_results in result.node_results.items():
-                    ok = all(not r.errors for r in port_results)
-                    await ui.run_javascript(f"pfHighlightNode({json.dumps(node_id)}, {json.dumps(ok)})")
-                n.dismiss()
-            status = result.status.upper()
-            color = "positive" if status == "SUCCESS" else "negative"
-            ui.notify(f"Run {status} — {len(result.errors)} error(s)", type=color)
-            right_panel.refresh()
+            async def run_all():
+                wf = get_wf()
+                with ui.notification("Running workflow…", spinner=True, timeout=None) as n:
+                    result = execute_workflow(
+                        wf,
+                        project_dir=Path(base_path),
+                        temp_dir=Path("/tmp/pydataflow"),
+                        preview_limit=50,
+                    )
+                    await save_run(result)
+                    storage["run_result"] = result.model_dump()
+                    for node_id, port_results in result.node_results.items():
+                        ok = all(not r.errors for r in port_results)
+                        await ui.run_javascript(
+                            f"pfHighlightNode({json.dumps(node_id)}, {json.dumps(ok)})"
+                        )
+                    n.dismiss()
+                status = result.status.upper()
+                color = "positive" if status == "SUCCESS" else "negative"
+                ui.notify(f"Run {status} — {len(result.errors)} error(s)", type=color)
+                right_panel.refresh()
 
-        async def export_python():
-            wf = get_wf()
-            code = generate_python(wf)
-            with ui.dialog() as dlg, ui.card().classes("w-full max-w-4xl"):
-                ui.label("Exported Python").classes("text-lg font-bold")
-                ui.code(code, language="python").classes("w-full text-xs")
-                with ui.row():
-                    ui.button("Copy to clipboard", on_click=lambda: ui.run_javascript(f"navigator.clipboard.writeText({json.dumps(code)}); ")).props("flat color=blue")
-                    ui.button("Close", on_click=dlg.close).props("flat")
-            dlg.open()
+            async def export_python():
+                wf = get_wf()
+                code = generate_python(wf)
+                with ui.dialog() as dlg, ui.card().classes("w-full max-w-4xl"):
+                    ui.label("Exported Python").classes("text-lg font-bold")
+                    ui.code(code, language="python").classes("w-full text-xs")
+                    with ui.row():
+                        ui.button(
+                            "Copy to clipboard",
+                            on_click=lambda: ui.run_javascript(
+                                f"navigator.clipboard.writeText({json.dumps(code)})"
+                            ),
+                        ).props("flat color=blue")
+                        ui.button("Close", on_click=dlg.close).props("flat")
+                dlg.open()
 
-        ui.button(icon="add", on_click=new_workflow).props("flat dense color=white").tooltip("New")
-        ui.button(icon="folder_open", on_click=open_dialog).props("flat dense color=white").tooltip("Open")
-        ui.button(icon="save", on_click=save_wf_to_db).props("flat dense color=white").tooltip("Save")
-        ui.button("▶ Run", on_click=run_all).classes("bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm font-medium")
-        ui.button(icon="code", on_click=export_python).props("flat dense color=white").tooltip("Export Python")
-
-    # ── Main layout ──────────────────────────────────────────────────────────
-    with ui.row().classes("w-full flex-nowrap").style("height: calc(100vh - 52px); overflow:hidden"):
-
-        # ── Left: Tool palette ────────────────────────────────────────────────
-        with ui.scroll_area().classes("bg-slate-50 border-r").style("width:280px;min-width:280px;height:100%;"):
-            ui.label("Tools").classes("text-xs font-bold text-gray-400 uppercase tracking-widest px-3 pt-4 pb-1")
-            ui.label("Click any tool to add it to the canvas").classes("text-xs text-gray-400 italic px-3 pb-3")
-            groups = _group_tools()
-            for category, cat_tools in groups.items():
-                color = TOOL_COLORS.get(category, "#6366f1")
-                with ui.expansion(category).classes("w-full").props("default-opened dense"):
-                    for tool in cat_tools:
-                        t_icon = TOOL_ICONS.get(tool["tool_type"], "extension")
-
-                        def make_add_handler(t=tool):
-                            async def _handler():
-                                await _add_node_from_tool(t, storage, save_wf, get_wf)
-                            return _handler
-
-                        with ui.button(on_click=make_add_handler()).classes(
-                            "w-full text-left justify-start rounded-none"
-                        ).props("flat dense no-caps").style("border-bottom:1px solid #f1f5f9; padding:6px 12px"):
-                            ui.icon(t_icon, size="xs").style(f"color:{color};margin-right:8px;min-width:18px")
-                            with ui.column().classes("items-start gap-0"):
-                                ui.label(tool["display_name"]).classes("text-sm font-medium text-slate-700")
-                                desc = tool.get("description", "")
-                                if desc:
-                                    ui.label(desc[:50]).classes("text-xs text-gray-400")
-
-
-        # ── Center: Canvas ────────────────────────────────────────────────────
-        with ui.element("div").classes("flex-1 relative overflow-hidden"):
-            ui.html('<div id="drawflow-canvas" style="width:100%;height:100%;"></div>')
-
-            # Load current workflow into canvas on page ready
-            wf_json = json.dumps(get_wf().model_dump())
-            ui.timer(
-                0.5,
-                lambda: ui.run_javascript(f"pfLoadWorkflow({wf_json})"),
-                once=True,
+            ui.button(icon="add", on_click=new_workflow).props("flat dense color=white").tooltip("New")
+            ui.button(icon="folder_open", on_click=open_dialog).props("flat dense color=white").tooltip("Open")
+            ui.button(icon="save", on_click=save_wf_to_db).props("flat dense color=white").tooltip("Save")
+            ui.link("Custom Tools", "/custom-tools").classes("text-blue-300 text-sm hover:text-blue-100 mx-2")
+            ui.button("▶ Run", on_click=run_all).classes(
+                "bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm font-medium"
             )
+            ui.button(icon="code", on_click=export_python).props("flat dense color=white").tooltip("Export Python")
 
-        # ── Right: Config + Results ───────────────────────────────────────────
-        @ui.refreshable
-        def right_panel():
-            with ui.scroll_area().style("width:340px;min-width:340px;"):
-                _render_right_panel(storage, get_wf, save_wf, base_path)
+        # ── Main body (fills remaining height) ────────────────────────────────
+        # min-height:0 is required for flex children to shrink below content size.
+        with ui.row().classes("w-full flex-nowrap flex-1").style("min-height:0; overflow:hidden;"):
 
-        right_panel()
+            # ── Left: Tool palette ────────────────────────────────────────────
+            with ui.scroll_area().style(
+                "width:280px; min-width:280px; height:100%; "
+                "background:#f8fafc; border-right:1px solid #e2e8f0;"
+            ):
+                ui.label("Tools").classes(
+                    "text-xs font-bold text-gray-400 uppercase tracking-widest px-3 pt-4 pb-1"
+                )
+                ui.label("Click any tool to add it to the canvas").classes(
+                    "text-xs text-gray-400 italic px-3 pb-3"
+                )
+                groups = _group_tools()
+                for category, cat_tools in groups.items():
+                    color = TOOL_COLORS.get(category, "#6366f1")
+                    with ui.expansion(category).classes("w-full").props("default-opened dense"):
+                        for tool in cat_tools:
+                            t_icon = TOOL_ICONS.get(tool["tool_type"], "extension")
 
-    # Register FastAPI endpoints for canvas events
+                            def make_add_handler(t=tool):
+                                async def _handler():
+                                    await _add_node_from_tool(t, storage, save_wf, get_wf)
+                                return _handler
+
+                            with ui.button(on_click=make_add_handler()).classes(
+                                "w-full text-left justify-start rounded-none"
+                            ).props("flat dense no-caps").style(
+                                "border-bottom:1px solid #f1f5f9; padding:6px 12px;"
+                            ):
+                                ui.icon(t_icon, size="xs").style(
+                                    f"color:{color}; margin-right:8px; min-width:18px;"
+                                )
+                                with ui.column().classes("items-start gap-0"):
+                                    ui.label(tool["display_name"]).classes(
+                                        "text-sm font-medium text-slate-700"
+                                    )
+                                    desc = tool.get("description", "")
+                                    if desc:
+                                        ui.label(desc[:50]).classes("text-xs text-gray-400")
+
+            # ── Center: Canvas ────────────────────────────────────────────────
+            # position:relative + absolute child fills the flex cell reliably.
+            with ui.element("div").style(
+                "flex:1; min-width:0; height:100%; position:relative; background:#f1f5f9;"
+            ):
+                ui.html(
+                    '<div id="drawflow-canvas" '
+                    'style="position:absolute; inset:0; width:100%; height:100%;"></div>'
+                )
+                wf_json = json.dumps(get_wf().model_dump())
+                ui.timer(0.5, lambda: ui.run_javascript(f"pfLoadWorkflow({wf_json})"), once=True)
+
+            # ── Right: Config + Results ───────────────────────────────────────
+            @ui.refreshable
+            def right_panel():
+                with ui.scroll_area().style(
+                    "width:340px; min-width:340px; height:100%; "
+                    "border-left:1px solid #e2e8f0;"
+                ):
+                    _render_right_panel(storage, get_wf, save_wf, base_path)
+
+            right_panel()
+
+    # Register canvas event endpoints
     _register_canvas_routes(storage, save_wf, get_wf, right_panel)
 
 
