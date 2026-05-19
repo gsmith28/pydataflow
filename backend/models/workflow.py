@@ -76,6 +76,8 @@ class DataSchema(BaseModel):
 
 
 class NodeResult(BaseModel):
+    model_config = {"arbitrary_types_allowed": True, "populate_by_name": True}
+
     node_id: str
     port: str
     record_count: Optional[int] = None
@@ -83,7 +85,7 @@ class NodeResult(BaseModel):
     execution_time_ms: Optional[float] = None
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
-    schema: Optional[DataSchema] = None
+    output_schema: Optional[DataSchema] = Field(default=None)
     preview_rows: Optional[list[dict[str, Any]]] = None
     preview_columns: Optional[list[str]] = None
 
