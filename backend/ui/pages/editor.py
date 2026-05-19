@@ -464,20 +464,31 @@ async def _render_editor(base_path: str) -> None:
     with ui.row().classes("w-full flex-nowrap").style("height: calc(100vh - 52px); overflow:hidden"):
 
         # ── Left: Tool palette ────────────────────────────────────────────────
-        with ui.scroll_area().classes("bg-slate-50 border-r").style("width:220px;min-width:220px;"):
-            ui.label("Tools").classes("text-xs font-bold text-gray-500 uppercase px-3 pt-3 pb-1")
+        with ui.scroll_area().classes("bg-slate-50 border-r").style("width:280px;min-width:280px;height:100%;"):
+            ui.label("Tools").classes("text-xs font-bold text-gray-400 uppercase tracking-widest px-3 pt-4 pb-1")
+            ui.label("Click any tool to add it to the canvas").classes("text-xs text-gray-400 italic px-3 pb-3")
             groups = _group_tools()
-            for category, tools in groups.items():
+            for category, cat_tools in groups.items():
                 color = TOOL_COLORS.get(category, "#6366f1")
-                with ui.expansion(category, icon="folder").classes("text-xs px-1").props(f"header-class=text-xs"):
-                    for tool in tools:
-                        icon = TOOL_ICONS.get(tool["tool_type"], "extension")
-                        with ui.row().classes(
-                            "w-full items-center gap-1 px-2 py-1 rounded cursor-pointer "
-                            "hover:bg-blue-50 select-none"
-                        ).on("click", lambda t=tool: _add_node_from_tool(t, storage, save_wf, get_wf)):
-                            ui.icon(icon, size="xs").style(f"color:{color}")
-                            ui.label(tool["display_name"]).classes("text-xs")
+                with ui.expansion(category).classes("w-full").props("default-opened dense"):
+                    for tool in cat_tools:
+                        t_icon = TOOL_ICONS.get(tool["tool_type"], "extension")
+
+                        def make_add_handler(t=tool):
+                            async def _handler():
+                                await _add_node_from_tool(t, storage, save_wf, get_wf)
+                            return _handler
+
+                        with ui.button(on_click=make_add_handler()).classes(
+                            "w-full text-left justify-start rounded-none"
+                        ).props("flat dense no-caps").style("border-bottom:1px solid #f1f5f9; padding:6px 12px"):
+                            ui.icon(t_icon, size="xs").style(f"color:{color};margin-right:8px;min-width:18px")
+                            with ui.column().classes("items-start gap-0"):
+                                ui.label(tool["display_name"]).classes("text-sm font-medium text-slate-700")
+                                desc = tool.get("description", "")
+                                if desc:
+                                    ui.label(desc[:50]).classes("text-xs text-gray-400")
+
 
         # ── Center: Canvas ────────────────────────────────────────────────────
         with ui.element("div").classes("flex-1 relative overflow-hidden"):
@@ -505,12 +516,16 @@ async def _render_editor(base_path: str) -> None:
 
 async def _add_node_from_tool(tool: dict, storage, save_wf, get_wf) -> None:
     wf = get_wf()
+    # Stagger new nodes so they don't stack
+    n = len(wf.nodes)
+    x = 120 + (n % 4) * 220
+    y = 80 + (n // 4) * 160
     node = WorkflowNode(
         tool_type=tool["tool_type"],
         display_name=tool["display_name"],
         input_ports=tool["input_ports"],
         output_ports=tool["output_ports"],
-        position=Position(x=200, y=200),
+        position=Position(x=x, y=y),
     )
     wf.nodes.append(node)
     save_wf(wf)
