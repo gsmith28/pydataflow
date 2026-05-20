@@ -7,7 +7,7 @@ from typing import Optional
 from constants import (
     DARK_BG, PANEL_BG, CANVAS_BG, TEXT_FG, DIM_FG, ENTRY_BG,
     CATEGORIES, TOOL_COLORS, CONTAINER_DEFAULT_W, CONTAINER_DEFAULT_H,
-    NODE_W, NODE_H,
+    NODE_W, NODE_H, SELECT_OUTLINE,
 )
 from nodes import get_tool, all_tools
 from engine import Node, Edge, execute_flow
@@ -63,6 +63,10 @@ class FlowApp:
         # project
         self.project_path: Optional[str] = None
         self._dirty: bool = False
+
+        # palette drag-to-canvas
+        self.palette_drag_kind: Optional[str] = None
+        self.palette_drag_ghost: Optional[tk.Toplevel] = None
 
         self._apply_theme()
         self._build_ui()
@@ -216,29 +220,22 @@ class FlowApp:
                     continue
                 color = TOOL_COLORS.get(kind, "#4a4a70")
 
-                def make_adder(k=kind):
-                    def _add():
-                        cx = max(0, (self.canvas.winfo_width()  // 2 - self.pan_x) / self.zoom - NODE_W // 2)
-                        cy = max(0, (self.canvas.winfo_height() // 2 - self.pan_y) / self.zoom - NODE_H // 2)
-                        # Stagger
-                        n = len(self.nodes)
-                        cx += (n % 4) * (NODE_W + 30)
-                        cy += (n // 4) * (NODE_H + 20)
-                        self.add_node(k, cx, cy)
-                    return _add
-
-                row = tk.Frame(inner, bg=PANEL_BG, cursor="hand2")
+                row = tk.Frame(inner, bg=PANEL_BG, cursor="fleur")
                 row.pack(fill="x", padx=4, pady=1)
                 indicator = tk.Frame(row, bg=color, width=4)
                 indicator.pack(side="left", fill="y")
                 lbl = tk.Label(row, text=tool.display_name, bg=PANEL_BG,
                                fg=TEXT_FG, font=("Segoe UI", 9), anchor="w",
-                               padx=6, pady=4, cursor="hand2")
+                               padx=6, pady=4, cursor="fleur")
                 lbl.pack(side="left", fill="x", expand=True)
 
-                _cmd = make_adder(kind)
-                row.bind("<Button-1>", lambda e, c=_cmd: c())
-                lbl.bind("<Button-1>", lambda e, c=_cmd: c())
+                # Drag-to-canvas: press starts ghost, release on canvas adds node
+                for widget in (row, lbl):
+                    widget.bind("<ButtonPress-1>",
+                                lambda e, k=kind, c=color: self._palette_drag_start(e, k, c))
+                    widget.bind("<B1-Motion>",   self._palette_drag_motion)
+                    widget.bind("<ButtonRelease-1>", self._palette_drag_release)
+
                 row.bind("<Enter>", lambda e, r=row: r.configure(bg="#333350"))
                 row.bind("<Leave>", lambda e, r=row: r.configure(bg=PANEL_BG))
                 lbl.bind("<Enter>", lambda e, r=row: r.configure(bg="#333350"))
@@ -523,6 +520,60 @@ class FlowApp:
         container.params["collapsed"] = False
         container.params.pop("_child_offsets", None)
         self.mark_dirty()
+
+    # ── Palette drag-to-canvas ───────────────────────────────────────────────
+
+    def _palette_drag_start(self, event, kind: str, color: str) -> None:
+        self.palette_drag_kind = kind
+        tool = get_tool(kind)
+        ghost = tk.Toplevel(self.root)
+        ghost.overrideredirect(True)
+        try:
+            ghost.attributes("-alpha", 0.80)
+            ghost.attributes("-topmost", True)
+        except Exception:
+            pass
+        tk.Label(ghost, text=f"  {tool.display_name}  ",
+                 bg=color, fg="#ffffff",
+                 font=("Segoe UI", 9, "bold"),
+                 padx=8, pady=6, relief="flat").pack()
+        ghost.geometry(f"+{event.x_root + 12}+{event.y_root + 12}")
+        self.palette_drag_ghost = ghost
+
+    def _palette_drag_motion(self, event) -> None:
+        if self.palette_drag_ghost:
+            self.palette_drag_ghost.geometry(
+                f"+{event.x_root + 12}+{event.y_root + 12}")
+            # Highlight canvas edge when hovering over it
+            cx = self.canvas.winfo_rootx()
+            cy = self.canvas.winfo_rooty()
+            cw = self.canvas.winfo_width()
+            ch = self.canvas.winfo_height()
+            over = (cx <= event.x_root <= cx + cw and
+                    cy <= event.y_root <= cy + ch)
+            self.canvas.configure(
+                highlightthickness=2 if over else 0,
+                highlightbackground=SELECT_OUTLINE)
+
+    def _palette_drag_release(self, event) -> None:
+        self.canvas.configure(highlightthickness=0)
+        if self.palette_drag_ghost:
+            self.palette_drag_ghost.destroy()
+            self.palette_drag_ghost = None
+        kind = self.palette_drag_kind
+        self.palette_drag_kind = None
+        if not kind:
+            return
+        cx = self.canvas.winfo_rootx()
+        cy = self.canvas.winfo_rooty()
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        if (cx <= event.x_root <= cx + cw and
+                cy <= event.y_root <= cy + ch):
+            sx = event.x_root - cx
+            sy = event.y_root - cy
+            wx, wy = self._s2w(sx, sy)
+            self.add_node(kind, wx, wy)
 
     # ── Redraw ───────────────────────────────────────────────────────────────
 

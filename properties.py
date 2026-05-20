@@ -79,11 +79,18 @@ class PropertiesPanel:
             cv.yview_scroll(int(-1 * (event.delta / 120)), "units")
         cv.bind("<MouseWheel>", _wheel)
 
-        # ── Column inference ──────────────────────────────────────────────
-        columns: list[str] = []
-        if tool.ins:
+        # ── Column inference (per port) ───────────────────────────────────
+        if len(tool.ins) == 0:
+            columns: object = []
+        elif len(tool.ins) == 1:
             columns = infer_columns(node.id, tool.ins[0],
                                     self.app.nodes, self.app.edges)
+        else:
+            # Multi-input: pass dict keyed by port name
+            columns = {
+                port: infer_columns(node.id, port, self.app.nodes, self.app.edges)
+                for port in tool.ins
+            }
 
         # We keep a reference so the code preview can be refreshed
         code_text_ref: list[tk.Text] = []
