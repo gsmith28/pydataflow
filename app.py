@@ -72,6 +72,7 @@ class FlowApp:
         self._build_ui()
         self.renderer = Renderer(self.canvas)
         self.root.after(50, self.redraw)
+        self.root.after(100, self._init_sash_positions)
 
     # ── Theme ───────────────────────────────────────────────────────────────
 
@@ -125,10 +126,12 @@ class FlowApp:
         outer = tk.PanedWindow(self.root, orient="vertical",
                                bg="#111120", sashwidth=5, sashrelief="flat")
         outer.pack(fill="both", expand=True)
+        self._outer_pane = outer
 
         # Top area (horizontal: palette | canvas | props)
         top = tk.PanedWindow(outer, orient="horizontal",
                              bg="#111120", sashwidth=5, sashrelief="flat")
+        self._top_pane = top
 
         # Left palette
         pal_outer = tk.Frame(top, bg=PANEL_BG, width=200)
@@ -156,6 +159,13 @@ class FlowApp:
         outer.add(bottom, minsize=120, height=160)
 
         self._bind_canvas()
+
+    def _init_sash_positions(self) -> None:
+        w = self.root.winfo_width()
+        h = self.root.winfo_height()
+        self._top_pane.sash_place(0, 200, 0)
+        self._top_pane.sash_place(1, w - 285, 0)
+        self._outer_pane.sash_place(0, h - 190, 0)
 
     def _build_toolbar(self, tb: tk.Frame) -> None:
         def btn(text, cmd, accent=False, pad=2):
