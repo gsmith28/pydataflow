@@ -1,0 +1,788 @@
+from __future__ import annotations
+import os
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+from typing import Optional
+
+from constants import (
+    DARK_BG, PANEL_BG, CANVAS_BG, TEXT_FG, DIM_FG, ENTRY_BG,
+    CATEGORIES, TOOL_COLORS, CONTAINER_DEFAULT_W, CONTAINER_DEFAULT_H,
+    NODE_W, NODE_H,
+)
+from nodes import get_tool, all_tools
+from engine import Node, Edge, execute_flow
+from renderer import Renderer, _hidden_ids
+from properties import PropertiesPanel
+import project_io
+import export_script
+
+
+class FlowApp:
+    def __init__(self) -> None:
+        self.root = tk.Tk()
+        self.root.title("FlowBuilder")
+        self.root.geometry("1400x820")
+        self.root.minsize(900, 600)
+
+        # ── State ──────────────────────────────────────────────────────────
+        self.nodes: list[Node] = []
+        self.edges: list[Edge] = []
+        self.nodes_by_id: dict[str, Node] = {}
+
+        self.selected_ids: set[str] = set()
+        self.selected_edge_ids: set[str] = set()
+        self.hover_port: tuple | None = None
+
+        self.zoom: float = 1.0
+        self.pan_x: float = 40.0
+        self.pan_y: float = 40.0
+
+        # drag
+        self.drag_node: Optional[Node] = None
+        self.drag_offset_x: float = 0.0
+        self.drag_offset_y: float = 0.0
+        self.drag_children: list[Node] = []
+        self.drag_child_offsets: dict = {}
+
+        # wire
+        self.wire_start_node: Optional[Node] = None
+        self.wire_start_port: Optional[str] = None
+        self.wire_start_dir: Optional[str] = None
+        self.wire_pos: Optional[tuple] = None
+
+        # pan
+        self.panning: bool = False
+        self.pan_start: tuple = (0, 0)
+        self.pan_start_off: tuple = (0.0, 0.0)
+
+        # resize
+        self.resizing: Optional[Node] = None
+        self.resize_start_mouse: tuple = (0, 0)
+        self.resize_start_size: tuple = (0, 0)
+
+        # project
+        self.project_path: Optional[str] = None
+        self._dirty: bool = False
+
+        self._apply_theme()
+        self._build_ui()
+        self.renderer = Renderer(self.canvas)
+        self.root.after(50, self.redraw)
+
+    # ── Theme ───────────────────────────────────────────────────────────────
+
+    def _apply_theme(self) -> None:
+        style = ttk.Style(self.root)
+        style.theme_use("clam")
+        bg, fg, entry, sel = DARK_BG, TEXT_FG, ENTRY_BG, "#3a3a5a"
+        btn, btn_a = "#353548", "#454560"
+        style.configure(".", background=bg, foreground=fg, font=("Segoe UI", 9))
+        style.configure("TFrame",      background=bg)
+        style.configure("TLabel",      background=bg, foreground=fg)
+        style.configure("TButton",     background=btn, foreground=fg,
+                        borderwidth=1, relief="flat", padding=(6, 3))
+        style.map("TButton", background=[("active", btn_a)])
+        style.configure("Accent.TButton", background="#3a6fa8", foreground="#ffffff")
+        style.map("Accent.TButton", background=[("active", "#4a8fc8")])
+        style.configure("TEntry",      fieldbackground=entry, foreground=fg,
+                        insertcolor=fg)
+        style.configure("TCombobox",   fieldbackground=entry, foreground=fg,
+                        selectbackground=sel)
+        style.map("TCombobox",         fieldbackground=[("readonly", entry)])
+        style.configure("TCheckbutton", background=bg, foreground=fg)
+        style.map("TCheckbutton",       background=[("active", bg)])
+        style.configure("TScrollbar",   background=PANEL_BG, troughcolor=bg,
+                        arrowcolor=fg)
+        style.configure("Treeview",     background=entry, foreground=fg,
+                        fieldbackground=entry, rowheight=22)
+        style.configure("Treeview.Heading", background=PANEL_BG, foreground=fg,
+                        relief="flat")
+        style.map("Treeview",           background=[("selected", sel)])
+        style.configure("TNotebook",    background=bg)
+        style.configure("TNotebook.Tab", background=PANEL_BG, foreground=fg,
+                        padding=(8, 4))
+        style.map("TNotebook.Tab",      background=[("selected", sel)])
+        style.configure("TPanedwindow", background="#111120")
+        style.configure("TLabelframe",  background=bg, foreground=fg)
+        style.configure("TLabelframe.Label", background=bg, foreground=fg)
+        style.configure("TSeparator",   background="#3a3a5a")
+        self.root.configure(bg=bg)
+
+    # ── UI construction ─────────────────────────────────────────────────────
+
+    def _build_ui(self) -> None:
+        # Toolbar
+        tb = tk.Frame(self.root, bg="#15152a", height=40)
+        tb.pack(fill="x", side="top")
+        tb.pack_propagate(False)
+        self._build_toolbar(tb)
+
+        # Main pane (vertical: top_area | bottom_log)
+        outer = tk.PanedWindow(self.root, orient="vertical",
+                               bg="#111120", sashwidth=5, sashrelief="flat")
+        outer.pack(fill="both", expand=True)
+
+        # Top area (horizontal: palette | canvas | props)
+        top = tk.PanedWindow(outer, orient="horizontal",
+                             bg="#111120", sashwidth=5, sashrelief="flat")
+
+        # Left palette
+        pal_outer = tk.Frame(top, bg=PANEL_BG, width=200)
+        self._build_palette(pal_outer)
+        top.add(pal_outer, minsize=160, width=200)
+
+        # Canvas
+        canvas_frame = tk.Frame(top, bg=CANVAS_BG)
+        self.canvas = tk.Canvas(canvas_frame, bg=CANVAS_BG,
+                                highlightthickness=0, cursor="crosshair")
+        self.canvas.pack(fill="both", expand=True)
+        top.add(canvas_frame, minsize=400)
+
+        # Right properties
+        props_outer = tk.Frame(top, bg=PANEL_BG, width=280)
+        self.props_panel = PropertiesPanel(props_outer, self)
+        top.add(props_outer, minsize=220, width=280)
+
+        outer.add(top)
+
+        # Bottom log / preview
+        bottom = ttk.Notebook(outer)
+        self._log_text = self._make_log_tab(bottom)
+        self._preview_frame = self._make_preview_tab(bottom)
+        outer.add(bottom, minsize=120, height=160)
+
+        self._bind_canvas()
+
+    def _build_toolbar(self, tb: tk.Frame) -> None:
+        def btn(text, cmd, accent=False, pad=2):
+            style = "Accent.TButton" if accent else "TButton"
+            b = ttk.Button(tb, text=text, command=cmd, style=style)
+            b.pack(side="left", padx=pad, pady=4)
+            return b
+
+        btn("▶  Run", self.run_flow, accent=True)
+        ttk.Separator(tb, orient="vertical").pack(side="left", fill="y", padx=4, pady=6)
+        btn("Open", self.open_project)
+        btn("Save", self.save_project)
+        btn("Save As", self.save_project_as)
+        ttk.Separator(tb, orient="vertical").pack(side="left", fill="y", padx=4, pady=6)
+        btn("Export .py", self.export_python)
+        btn("Clear", self.clear_canvas)
+        ttk.Separator(tb, orient="vertical").pack(side="left", fill="y", padx=4, pady=6)
+        btn("Fit", self.fit_view)
+        btn("1:1", self.reset_zoom)
+
+        self._title_var = tk.StringVar(value="FlowBuilder — untitled")
+        tk.Label(tb, textvariable=self._title_var,
+                 bg="#15152a", fg=DIM_FG,
+                 font=("Segoe UI", 9)).pack(side="right", padx=12)
+
+    def _build_palette(self, parent: tk.Frame) -> None:
+        header = tk.Label(parent, text="NODES", bg=PANEL_BG,
+                          fg=DIM_FG, font=("Segoe UI", 8, "bold"),
+                          anchor="w", padx=8)
+        header.pack(fill="x")
+
+        # Scrollable area
+        cv = tk.Canvas(parent, bg=PANEL_BG, highlightthickness=0)
+        sb = ttk.Scrollbar(parent, orient="vertical", command=cv.yview)
+        cv.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        cv.pack(fill="both", expand=True)
+
+        inner = tk.Frame(cv, bg=PANEL_BG)
+        win = cv.create_window((0, 0), window=inner, anchor="nw")
+
+        def _resize(e=None):
+            cv.configure(scrollregion=cv.bbox("all"))
+            cv.itemconfigure(win, width=cv.winfo_width())
+
+        inner.bind("<Configure>", _resize)
+        cv.bind("<Configure>", lambda e: cv.itemconfigure(win, width=cv.winfo_width()))
+
+        def _wheel(e):
+            cv.yview_scroll(int(-1 * (e.delta / 120)), "units")
+        cv.bind("<MouseWheel>", _wheel)
+
+        tool_map = {t.node_type: t for t in all_tools()}
+        for cat_name, kinds in CATEGORIES:
+            cat_lbl = tk.Label(inner, text=cat_name.upper(), bg=PANEL_BG,
+                               fg=DIM_FG, font=("Segoe UI", 7, "bold"),
+                               anchor="w", padx=6, pady=4)
+            cat_lbl.pack(fill="x", pady=(8, 0))
+            for kind in kinds:
+                tool = tool_map.get(kind)
+                if not tool:
+                    continue
+                color = TOOL_COLORS.get(kind, "#4a4a70")
+
+                def make_adder(k=kind):
+                    def _add():
+                        cx = max(0, (self.canvas.winfo_width()  // 2 - self.pan_x) / self.zoom - NODE_W // 2)
+                        cy = max(0, (self.canvas.winfo_height() // 2 - self.pan_y) / self.zoom - NODE_H // 2)
+                        # Stagger
+                        n = len(self.nodes)
+                        cx += (n % 4) * (NODE_W + 30)
+                        cy += (n // 4) * (NODE_H + 20)
+                        self.add_node(k, cx, cy)
+                    return _add
+
+                row = tk.Frame(inner, bg=PANEL_BG, cursor="hand2")
+                row.pack(fill="x", padx=4, pady=1)
+                indicator = tk.Frame(row, bg=color, width=4)
+                indicator.pack(side="left", fill="y")
+                lbl = tk.Label(row, text=tool.display_name, bg=PANEL_BG,
+                               fg=TEXT_FG, font=("Segoe UI", 9), anchor="w",
+                               padx=6, pady=4, cursor="hand2")
+                lbl.pack(side="left", fill="x", expand=True)
+
+                _cmd = make_adder(kind)
+                row.bind("<Button-1>", lambda e, c=_cmd: c())
+                lbl.bind("<Button-1>", lambda e, c=_cmd: c())
+                row.bind("<Enter>", lambda e, r=row: r.configure(bg="#333350"))
+                row.bind("<Leave>", lambda e, r=row: r.configure(bg=PANEL_BG))
+                lbl.bind("<Enter>", lambda e, r=row: r.configure(bg="#333350"))
+                lbl.bind("<Leave>", lambda e, r=row: r.configure(bg=PANEL_BG))
+
+    def _make_log_tab(self, nb: ttk.Notebook) -> tk.Text:
+        frame = ttk.Frame(nb)
+        nb.add(frame, text="  Log  ")
+        text = tk.Text(frame, bg="#0d0d1a", fg=TEXT_FG,
+                       font=("Courier New", 8), state="disabled",
+                       relief="flat", height=6)
+        sb = ttk.Scrollbar(frame, orient="vertical", command=text.yview)
+        text.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        text.pack(fill="both", expand=True)
+        return text
+
+    def _make_preview_tab(self, nb: ttk.Notebook) -> ttk.Frame:
+        frame = ttk.Frame(nb)
+        nb.add(frame, text="  Preview  ")
+        return frame
+
+    # ── Canvas event binding ─────────────────────────────────────────────────
+
+    def _bind_canvas(self) -> None:
+        c = self.canvas
+        c.bind("<Button-1>",        self._on_click)
+        c.bind("<B1-Motion>",       self._on_drag)
+        c.bind("<ButtonRelease-1>", self._on_release)
+        c.bind("<Button-2>",        self._start_pan)
+        c.bind("<B2-Motion>",       self._do_pan)
+        c.bind("<Button-3>",        self._on_right_click)
+        c.bind("<Double-Button-1>", self._on_double_click)
+        c.bind("<MouseWheel>",      self._on_scroll)   # Windows / macOS
+        c.bind("<Button-4>",        lambda e: self._scroll_delta(e,  120))  # Linux up
+        c.bind("<Button-5>",        lambda e: self._scroll_delta(e, -120))  # Linux down
+
+    # ── Canvas events ────────────────────────────────────────────────────────
+
+    def _on_click(self, event) -> None:
+        node, hit, port = self.renderer.hit_test(self, event.x, event.y)
+
+        if hit == "port_out":
+            self.wire_start_node = node
+            self.wire_start_port = port
+            self.wire_start_dir  = "out"
+            self.wire_pos        = (event.x, event.y)
+        elif hit == "port_in":
+            self.wire_start_node = node
+            self.wire_start_port = port
+            self.wire_start_dir  = "in"
+            self.wire_pos        = (event.x, event.y)
+        elif hit == "resize" and node:
+            self.resizing = node
+            self.resize_start_mouse = (event.x, event.y)
+            self.resize_start_size  = (
+                node.params.get("_w", CONTAINER_DEFAULT_W),
+                node.params.get("_h", CONTAINER_DEFAULT_H),
+            )
+        elif hit in ("title", "body") and node:
+            self._select_node(node)
+            wx, wy = self._s2w(event.x, event.y)
+            self.drag_node     = node
+            self.drag_offset_x = wx - node.x
+            self.drag_offset_y = wy - node.y
+            if node.kind == "container" and not node.params.get("collapsed"):
+                self.drag_children = self._container_children(node)
+                self.drag_child_offsets = {
+                    c.id: (c.x - node.x, c.y - node.y) for c in self.drag_children
+                }
+            else:
+                self.drag_children = []
+        else:
+            self._deselect()
+            self.panning = True
+            self.pan_start     = (event.x, event.y)
+            self.pan_start_off = (self.pan_x, self.pan_y)
+        self.redraw()
+
+    def _on_drag(self, event) -> None:
+        if self.wire_start_node:
+            self.wire_pos = (event.x, event.y)
+            n, hit, port = self.renderer.hit_test(self, event.x, event.y)
+            self.hover_port = (n.id, port, "in" if hit == "port_in" else "out") \
+                if n and hit in ("port_in", "port_out") else None
+            self.redraw()
+        elif self.drag_node:
+            wx, wy = self._s2w(event.x, event.y)
+            self.drag_node.x = wx - self.drag_offset_x
+            self.drag_node.y = wy - self.drag_offset_y
+            for child in self.drag_children:
+                ox, oy = self.drag_child_offsets[child.id]
+                child.x = self.drag_node.x + ox
+                child.y = self.drag_node.y + oy
+            self.mark_dirty()
+            self.redraw()
+        elif self.panning:
+            self.pan_x = self.pan_start_off[0] + event.x - self.pan_start[0]
+            self.pan_y = self.pan_start_off[1] + event.y - self.pan_start[1]
+            self.redraw()
+        elif self.resizing:
+            dx = (event.x - self.resize_start_mouse[0]) / self.zoom
+            dy = (event.y - self.resize_start_mouse[1]) / self.zoom
+            self.resizing.params["_w"] = max(80, self.resize_start_size[0] + dx)
+            self.resizing.params["_h"] = max(50, self.resize_start_size[1] + dy)
+            self.mark_dirty()
+            self.redraw()
+        else:
+            n, hit, port = self.renderer.hit_test(self, event.x, event.y)
+            new_hp = (n.id, port, "in" if hit == "port_in" else "out") \
+                if n and hit in ("port_in", "port_out") else None
+            if new_hp != self.hover_port:
+                self.hover_port = new_hp
+                self.redraw()
+
+    def _on_release(self, event) -> None:
+        if self.wire_start_node:
+            n, hit, port = self.renderer.hit_test(self, event.x, event.y)
+            if n and hit in ("port_in", "port_out"):
+                src_n, src_p, src_d = self.wire_start_node, self.wire_start_port, self.wire_start_dir
+                dst_d = "in" if hit == "port_in" else "out"
+                if src_d == "out" and dst_d == "in":
+                    self._add_edge(src_n, src_p, n, port)
+                elif src_d == "in" and dst_d == "out":
+                    self._add_edge(n, port, src_n, src_p)
+        self._reset_interaction()
+        self.redraw()
+
+    def _reset_interaction(self) -> None:
+        self.wire_start_node = None
+        self.wire_start_port = None
+        self.wire_start_dir  = None
+        self.wire_pos        = None
+        self.drag_node       = None
+        self.drag_children   = []
+        self.panning         = False
+        self.resizing        = None
+        self.hover_port      = None
+
+    def _start_pan(self, event) -> None:
+        self.panning       = True
+        self.pan_start     = (event.x, event.y)
+        self.pan_start_off = (self.pan_x, self.pan_y)
+
+    def _do_pan(self, event) -> None:
+        self.pan_x = self.pan_start_off[0] + event.x - self.pan_start[0]
+        self.pan_y = self.pan_start_off[1] + event.y - self.pan_start[1]
+        self.redraw()
+
+    def _on_right_click(self, event) -> None:
+        node, hit, port = self.renderer.hit_test(self, event.x, event.y)
+        menu = tk.Menu(self.root, tearoff=0, bg=PANEL_BG, fg=TEXT_FG,
+                       activebackground="#3a3a5a", activeforeground=TEXT_FG)
+        if node:
+            tool = get_tool(node.kind)
+            menu.add_command(label=f"{tool.display_name if tool else node.kind}  [{node.id}]",
+                             state="disabled")
+            menu.add_separator()
+            menu.add_command(label="Delete",
+                             command=lambda: self.delete_node(node))
+            label = "Enable" if node.disabled else "Disable"
+            menu.add_command(label=label, command=lambda: self.toggle_disabled(node))
+            if node.result:
+                menu.add_command(label="View data…",
+                                 command=lambda: self.show_table_viewer(node))
+        else:
+            menu.add_command(label="Fit view", command=self.fit_view)
+            menu.add_command(label="Reset zoom", command=self.reset_zoom)
+            wx, wy = self._s2w(event.x, event.y)
+            menu.add_separator()
+            menu.add_command(label="Add Comment here",
+                             command=lambda: self.add_node("comment", wx, wy))
+            menu.add_command(label="Add Container here",
+                             command=lambda: self.add_node("container", wx, wy))
+        menu.post(event.x_root, event.y_root)
+
+    def _on_double_click(self, event) -> None:
+        node, hit, _ = self.renderer.hit_test(self, event.x, event.y)
+        if node and node.kind == "container" and hit == "title":
+            if node.params.get("collapsed"):
+                self._expand_container(node)
+            else:
+                self._collapse_container(node)
+            self.redraw()
+
+    def _on_scroll(self, event) -> None:
+        self._scroll_delta(event, event.delta)
+
+    def _scroll_delta(self, event, delta: int) -> None:
+        factor = 1.1 if delta > 0 else (1 / 1.1)
+        new_zoom = max(0.15, min(4.0, self.zoom * factor))
+        wx = (event.x - self.pan_x) / self.zoom
+        wy = (event.y - self.pan_y) / self.zoom
+        self.pan_x = event.x - wx * new_zoom
+        self.pan_y = event.y - wy * new_zoom
+        self.zoom  = new_zoom
+        self.redraw()
+
+    # ── Coordinate helpers ────────────────────────────────────────────────────
+
+    def _s2w(self, sx: float, sy: float) -> tuple[float, float]:
+        return (sx - self.pan_x) / self.zoom, (sy - self.pan_y) / self.zoom
+
+    # ── Graph operations ─────────────────────────────────────────────────────
+
+    def add_node(self, kind: str, x: float, y: float) -> Node:
+        tool = get_tool(kind)
+        node = Node(kind, x, y)
+        if kind == "container":
+            node.params.setdefault("_w", CONTAINER_DEFAULT_W)
+            node.params.setdefault("_h", CONTAINER_DEFAULT_H)
+            node.params.setdefault("title", "Group")
+            node.params.setdefault("color", "#404060")
+        self.nodes.append(node)
+        self.nodes_by_id[node.id] = node
+        self.mark_dirty()
+        self._select_node(node)
+        self.redraw()
+        return node
+
+    def delete_node(self, node: Node) -> None:
+        self.edges = [e for e in self.edges
+                      if e.src_node != node.id and e.dst_node != node.id]
+        self.nodes.remove(node)
+        self.nodes_by_id.pop(node.id, None)
+        self.selected_ids.discard(node.id)
+        self.props_panel.clear()
+        self.mark_dirty()
+        self.redraw()
+
+    def toggle_disabled(self, node: Node) -> None:
+        node.disabled = not node.disabled
+        self.mark_dirty()
+        self.redraw()
+        self.props_panel.refresh()
+
+    def _add_edge(self, src: Node, src_port: str, dst: Node, dst_port: str) -> None:
+        # Remove any existing edge to this input port
+        self.edges = [e for e in self.edges
+                      if not (e.dst_node == dst.id and e.dst_port == dst_port)]
+        self.edges.append(Edge(src.id, src_port, dst.id, dst_port))
+        self.mark_dirty()
+
+    def _select_node(self, node: Node) -> None:
+        self.selected_ids = {node.id}
+        self.selected_edge_ids = set()
+        self.props_panel.show_node(node)
+        self._update_preview(node)
+
+    def _deselect(self) -> None:
+        self.selected_ids = set()
+        self.selected_edge_ids = set()
+        self.props_panel.clear()
+
+    # ── Container ────────────────────────────────────────────────────────────
+
+    def _container_children(self, container: Node) -> list[Node]:
+        w = container.params.get("_w", CONTAINER_DEFAULT_W)
+        h = container.params.get("_h", CONTAINER_DEFAULT_H)
+        return [
+            n for n in self.nodes
+            if n.id != container.id and n.kind != "container"
+            and container.x <= n.x <= container.x + w
+            and container.y <= n.y <= container.y + h
+        ]
+
+    def _collapse_container(self, container: Node) -> None:
+        children = self._container_children(container)
+        container.params["_child_offsets"] = {
+            c.id: (c.x - container.x, c.y - container.y) for c in children
+        }
+        container.params["collapsed"] = True
+        self.mark_dirty()
+
+    def _expand_container(self, container: Node) -> None:
+        offsets = container.params.get("_child_offsets", {})
+        for node in self.nodes:
+            if node.id in offsets:
+                ox, oy = offsets[node.id]
+                node.x = container.x + ox
+                node.y = container.y + oy
+        container.params["collapsed"] = False
+        container.params.pop("_child_offsets", None)
+        self.mark_dirty()
+
+    # ── Redraw ───────────────────────────────────────────────────────────────
+
+    def redraw(self) -> None:
+        self.renderer.redraw(self)
+
+    # ── Execution ────────────────────────────────────────────────────────────
+
+    def run_flow(self) -> None:
+        self._log_clear()
+        self._log("Running flow…")
+        try:
+            execute_flow(self.nodes, self.edges, log=self._log)
+            self._log("Done ✓")
+        except Exception as e:
+            self._log(f"Flow failed: {e}", "error")
+        self.redraw()
+        # Refresh properties to show result counts
+        self.props_panel.refresh()
+        # Show preview for selected node
+        for nid in self.selected_ids:
+            node = self.nodes_by_id.get(nid)
+            if node:
+                self._update_preview(node)
+                # Auto-open table viewers for show_table nodes
+                if node.kind == "show_table" and node.result:
+                    df = node.result.get("_show_viewer") or node.result.get("data")
+                    if df is not None and hasattr(df, "columns"):
+                        _open_table_window(self.root, f"Show Table [{node.id}]", df)
+
+    # ── Preview ──────────────────────────────────────────────────────────────
+
+    def _update_preview(self, node: Node) -> None:
+        for w in self._preview_frame.winfo_children():
+            w.destroy()
+        if not node.result:
+            ttk.Label(self._preview_frame,
+                      text="No data — run the flow first.",
+                      foreground=DIM_FG).pack(expand=True)
+            return
+
+        # Port buttons if multiple outputs
+        ports = [(p, df) for p, df in node.result.items()
+                 if hasattr(df, "columns")]
+        if not ports:
+            ttk.Label(self._preview_frame, text="No tabular output.",
+                      foreground=DIM_FG).pack(expand=True)
+            return
+
+        if len(ports) > 1:
+            btn_bar = ttk.Frame(self._preview_frame)
+            btn_bar.pack(fill="x")
+            for pname, pdf in ports:
+                def show_port(df=pdf, lbl=pname):
+                    self._render_preview_df(df, lbl)
+                ttk.Button(btn_bar, text=pname, command=show_port).pack(side="left", padx=2, pady=2)
+
+        self._render_preview_df(ports[0][1], ports[0][0])
+
+    def _render_preview_df(self, df, label: str = "") -> None:
+        # Clear existing tree
+        for w in self._preview_frame.winfo_children():
+            if isinstance(w, (ttk.Frame, tk.Frame)):
+                if hasattr(w, "_is_tree_frame"):
+                    w.destroy()
+
+        cols = list(df.columns)
+        frame = ttk.Frame(self._preview_frame)
+        frame._is_tree_frame = True  # type: ignore
+        frame.pack(fill="both", expand=True)
+
+        tree = ttk.Treeview(frame, columns=cols, show="headings", height=5)
+        vs = ttk.Scrollbar(frame, orient="vertical",   command=tree.yview)
+        hs = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=vs.set, xscrollcommand=hs.set)
+
+        for col in cols:
+            tree.heading(col, text=col)
+            tree.column(col, width=max(60, min(180, len(str(col)) * 9)), minwidth=40)
+
+        hs.pack(side="bottom", fill="x")
+        vs.pack(side="right",  fill="y")
+        tree.pack(fill="both", expand=True)
+
+        limit = min(200, len(df))
+        for _, row in df.head(limit).iterrows():
+            tree.insert("", "end", values=[str(v) if v is not None else "" for v in row])
+
+        ttk.Label(self._preview_frame,
+                  text=f"{label}  {len(df):,} rows × {len(df.columns)} cols"
+                       f"  (showing {limit})",
+                  foreground=DIM_FG, font=("Segoe UI", 8)).pack(side="bottom")
+
+    def show_table_viewer(self, node: Node) -> None:
+        if not node.result:
+            return
+        for port, df in node.result.items():
+            if hasattr(df, "columns"):
+                tool = get_tool(node.kind)
+                title = f"{tool.display_name if tool else node.kind} [{node.id}] — {port}"
+                _open_table_window(self.root, title, df)
+                break
+
+    # ── Logging ──────────────────────────────────────────────────────────────
+
+    def _log(self, msg: str, level: str = "info") -> None:
+        t = self._log_text
+        t.configure(state="normal")
+        tag_colors = {"error": "#ff6666", "warning": "#ffaa44", "info": TEXT_FG}
+        color = tag_colors.get(level, TEXT_FG)
+        t.tag_configure(level, foreground=color)
+        t.insert("end", msg + "\n", level)
+        t.see("end")
+        t.configure(state="disabled")
+
+    def _log_clear(self) -> None:
+        self._log_text.configure(state="normal")
+        self._log_text.delete("1.0", "end")
+        self._log_text.configure(state="disabled")
+
+    # ── Project operations ───────────────────────────────────────────────────
+
+    def mark_dirty(self) -> None:
+        self._dirty = True
+        self._update_title()
+
+    def _update_title(self) -> None:
+        name = os.path.basename(self.project_path) if self.project_path else "untitled"
+        dirty_star = " *" if self._dirty else ""
+        self._title_var.set(f"FlowBuilder — {name}{dirty_star}")
+
+    def save_project(self) -> None:
+        if not self.project_path:
+            self.save_project_as()
+            return
+        project_io.save_project(self.project_path, self.nodes, self.edges)
+        self._dirty = False
+        self._update_title()
+        self._log(f"Saved: {self.project_path}")
+
+    def save_project_as(self) -> None:
+        path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("FlowBuilder project", "*.json"), ("All", "*.*")],
+            title="Save project",
+        )
+        if path:
+            self.project_path = path
+            self.save_project()
+
+    def open_project(self) -> None:
+        if self._dirty and not messagebox.askyesno(
+                "Unsaved changes", "Discard unsaved changes?"):
+            return
+        path = filedialog.askopenfilename(
+            filetypes=[("FlowBuilder project", "*.json"), ("All", "*.*")],
+            title="Open project",
+        )
+        if path:
+            try:
+                nodes, edges = project_io.load_project(path)
+            except Exception as e:
+                messagebox.showerror("Load error", str(e))
+                return
+            self.nodes = nodes
+            self.edges = edges
+            self.nodes_by_id = {n.id: n for n in nodes}
+            self.project_path = path
+            self._dirty = False
+            self._update_title()
+            self._deselect()
+            self.fit_view()
+
+    def export_python(self) -> None:
+        path = filedialog.asksaveasfilename(
+            defaultextension=".py",
+            filetypes=[("Python script", "*.py"), ("All", "*.*")],
+            title="Export Python",
+        )
+        if path:
+            code = export_script.generate_python(self.nodes, self.edges)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(code)
+            self._log(f"Exported: {path}")
+
+    def clear_canvas(self) -> None:
+        if self._dirty and not messagebox.askyesno("Clear canvas", "Clear all nodes?"):
+            return
+        self.nodes.clear()
+        self.edges.clear()
+        self.nodes_by_id.clear()
+        self._deselect()
+        self._dirty = False
+        self._update_title()
+        self.redraw()
+
+    # ── View helpers ─────────────────────────────────────────────────────────
+
+    def fit_view(self) -> None:
+        if not self.nodes:
+            self.pan_x, self.pan_y, self.zoom = 40, 40, 1.0
+            self.redraw()
+            return
+        margin = 60
+        xs = [n.x for n in self.nodes]
+        ys = [n.y for n in self.nodes]
+        x_min, x_max = min(xs), max(xs) + NODE_W + 100
+        y_min, y_max = min(ys), max(ys) + NODE_H + 60
+        cw = self.canvas.winfo_width()  or 800
+        ch = self.canvas.winfo_height() or 500
+        available_w = cw - 2 * margin
+        available_h = ch - 2 * margin
+        world_w = x_max - x_min
+        world_h = y_max - y_min
+        if world_w < 1 or world_h < 1:
+            self.zoom = 1.0
+        else:
+            self.zoom = max(0.15, min(2.0, min(available_w / world_w, available_h / world_h)))
+        self.pan_x = margin - x_min * self.zoom
+        self.pan_y = margin - y_min * self.zoom
+        self.redraw()
+
+    def reset_zoom(self) -> None:
+        self.zoom = 1.0
+        self.redraw()
+
+    # ── Run ──────────────────────────────────────────────────────────────────
+
+    def run(self) -> None:
+        self.root.mainloop()
+
+
+# ── Module-level table viewer (also used by main.py) ─────────────────────────
+
+def _open_table_window(root: tk.Tk | tk.Toplevel, title: str, df) -> None:
+    win = tk.Toplevel(root)
+    win.title(title)
+    win.configure(bg=PANEL_BG)
+    win.geometry("900x520")
+
+    cols = list(df.columns)
+    frame = ttk.Frame(win)
+    frame.pack(fill="both", expand=True)
+
+    tree = ttk.Treeview(frame, columns=cols, show="headings")
+    vs = ttk.Scrollbar(frame, orient="vertical",   command=tree.yview)
+    hs = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
+    tree.configure(yscrollcommand=vs.set, xscrollcommand=hs.set)
+
+    for col in cols:
+        tree.heading(col, text=str(col))
+        tree.column(col, width=max(60, min(180, len(str(col)) * 9)), minwidth=40)
+
+    hs.pack(side="bottom", fill="x")
+    vs.pack(side="right",  fill="y")
+    tree.pack(fill="both", expand=True)
+
+    limit = min(500, len(df))
+    for _, row in df.head(limit).iterrows():
+        tree.insert("", "end", values=[str(v) if v is not None else "" for v in row])
+
+    ttk.Label(win, text=f"{len(df):,} rows × {len(df.columns)} cols  (showing {limit})",
+              background=PANEL_BG, foreground=DIM_FG).pack(pady=4)
