@@ -71,7 +71,6 @@ class FlowApp:
         self._build_ui()
         self.renderer = Renderer(self.canvas)
         self.root.after(50, self.redraw)
-        self.root.after(100, self._init_sash_positions)
 
     # ── Theme ───────────────────────────────────────────────────────────────
 
@@ -121,15 +120,21 @@ class FlowApp:
         tb.pack_propagate(False)
         self._build_toolbar(tb)
 
-        # Main pane (vertical: top_area | bottom_log)
-        outer = tk.PanedWindow(self.root, orient="vertical",
-                               bg="#111120", sashwidth=5, sashrelief="flat")
-        outer.pack(fill="both", expand=True)
-        self._outer_pane = outer
+        # Bottom log / preview — packed before the canvas area so it anchors to bottom
+        bottom = ttk.Notebook(self.root)
+        self._log_text = self._make_log_tab(bottom)
+        self._preview_frame = self._make_preview_tab(bottom)
+        bottom.pack(fill="x", side="bottom", ipady=4)
+        self._log_notebook = bottom
 
-        # Top area (horizontal: palette | canvas | props)
-        top = tk.PanedWindow(outer, orient="horizontal",
+        # Separator between canvas and log
+        sep = tk.Frame(self.root, bg="#3a3a5a", height=2)
+        sep.pack(fill="x", side="bottom")
+
+        # Top area (horizontal: palette | canvas | props) fills remaining space
+        top = tk.PanedWindow(self.root, orient="horizontal",
                              bg="#111120", sashwidth=5, sashrelief="flat")
+        top.pack(fill="both", expand=True)
         self._top_pane = top
 
         # Left palette
@@ -149,22 +154,21 @@ class FlowApp:
         self.props_panel = PropertiesPanel(props_outer, self)
         top.add(props_outer, minsize=220, width=280)
 
-        outer.add(top)
-
-        # Bottom log / preview
-        bottom = ttk.Notebook(outer)
-        self._log_text = self._make_log_tab(bottom)
-        self._preview_frame = self._make_preview_tab(bottom)
-        outer.add(bottom, minsize=120, height=160)
-
         self._bind_canvas()
 
-    def _init_sash_positions(self) -> None:
+        # Set horizontal sash positions once window dimensions are known
+        self.root.bind("<Configure>", self._on_first_configure)
+        self._sash_set = False
+
+    def _on_first_configure(self, _event=None) -> None:
+        if self._sash_set:
+            return
         w = self.root.winfo_width()
-        h = self.root.winfo_height()
+        if w < 100:
+            return
+        self._sash_set = True
         self._top_pane.sash_place(0, 200, 0)
         self._top_pane.sash_place(1, w - 285, 0)
-        self._outer_pane.sash_place(0, h - 190, 0)
 
     def _build_toolbar(self, tb: tk.Frame) -> None:
         def btn(text, cmd, accent=False, pad=2):
