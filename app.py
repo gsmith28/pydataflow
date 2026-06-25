@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import export_script
 import project_io
+import settings
 from canvas_controller import CanvasController
 from constants import (
     CANVAS_BG,
@@ -32,8 +33,9 @@ class FlowApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title("PyDataFlow")
-        self.root.geometry("1400x820")
+        self.root.geometry(settings.get("window_geometry") or "1400x820")
         self.root.minsize(900, 600)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # ── State ──────────────────────────────────────────────────────────
         self.nodes: list[Node] = []
@@ -238,8 +240,12 @@ class FlowApp:
 
         def _wheel(e):
             cv.yview_scroll(int(-1 * (e.delta / 120)), "units")
+            return "break"
 
+        # Bound to every palette widget so the wheel scrolls regardless of which
+        # child the pointer is over (events don't bubble to the canvas otherwise).
         cv.bind("<MouseWheel>", _wheel)
+        inner.bind("<MouseWheel>", _wheel)
 
         tool_map = {t.node_type: t for t in all_tools()}
         for cat_name, kinds in CATEGORIES:
@@ -254,6 +260,7 @@ class FlowApp:
                 pady=4,
             )
             cat_lbl.pack(fill="x", pady=(8, 0))
+            cat_lbl.bind("<MouseWheel>", _wheel)
             for kind in kinds:
                 tool = tool_map.get(kind)
                 if not tool:
@@ -285,6 +292,8 @@ class FlowApp:
                     )
                     widget.bind("<B1-Motion>", self._palette_drag_motion)
                     widget.bind("<ButtonRelease-1>", self._palette_drag_release)
+                for widget in (row, lbl, indicator):
+                    widget.bind("<MouseWheel>", _wheel)
 
                 row.bind("<Enter>", lambda e, r=row: r.configure(bg="#333350"))
                 row.bind("<Leave>", lambda e, r=row: r.configure(bg=PANEL_BG))
@@ -659,8 +668,10 @@ class FlowApp:
             defaultextension=".json",
             filetypes=[("PyDataFlow project", "*.json"), ("All", "*.*")],
             title="Save project",
+            initialdir=settings.last_dir(),
         )
         if path:
+            settings.remember_path(path)
             self.project_path = path
             self.save_project()
 
@@ -670,8 +681,10 @@ class FlowApp:
         path = filedialog.askopenfilename(
             filetypes=[("PyDataFlow project", "*.json"), ("All", "*.*")],
             title="Open project",
+            initialdir=settings.last_dir(),
         )
         if path:
+            settings.remember_path(path)
             try:
                 nodes, edges = project_io.load_project(path)
             except Exception as e:
@@ -691,8 +704,10 @@ class FlowApp:
             defaultextension=".py",
             filetypes=[("Python script", "*.py"), ("All", "*.*")],
             title="Export Python",
+            initialdir=settings.last_dir(),
         )
         if path:
+            settings.remember_path(path)
             code = export_script.generate_python(self.nodes, self.edges)
             with open(path, "w", encoding="utf-8") as f:
                 f.write(code)
@@ -710,6 +725,10 @@ class FlowApp:
         self.redraw()
 
     # ── Run ──────────────────────────────────────────────────────────────────
+
+    def _on_close(self) -> None:
+        settings.set("window_geometry", self.root.winfo_geometry())
+        self.root.destroy()
 
     def run(self) -> None:
         self.root.mainloop()

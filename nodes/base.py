@@ -13,6 +13,8 @@ from collections.abc import Callable
 from tkinter import filedialog, ttk
 from typing import TYPE_CHECKING
 
+import settings
+
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -210,10 +212,13 @@ class BaseTool:
         def browse():
             ft = filetypes or [("All files", "*.*")]
             if save:
-                p = filedialog.asksaveasfilename(filetypes=ft, defaultextension=default_ext)
+                p = filedialog.asksaveasfilename(
+                    filetypes=ft, defaultextension=default_ext, initialdir=settings.last_dir()
+                )
             else:
-                p = filedialog.askopenfilename(filetypes=ft)
+                p = filedialog.askopenfilename(filetypes=ft, initialdir=settings.last_dir())
             if p:
+                settings.remember_path(p)
                 var.set(p)
 
         self._lbl(parent, label, row)
