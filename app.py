@@ -322,8 +322,10 @@ class FlowApp:
             node.params.setdefault("_h", CONTAINER_DEFAULT_H)
             node.params.setdefault("title", "Group")
             node.params.setdefault("color", "#404060")
+            node.params.setdefault("_children", [])
         self.nodes.append(node)
         self.nodes_by_id[node.id] = node
+        self._update_node_membership(node)
         self.mark_dirty()
         self._select_node(node)
         self.redraw()
@@ -331,6 +333,11 @@ class FlowApp:
 
     def delete_node(self, node: Node) -> None:
         self.edges = [e for e in self.edges if e.src_node != node.id and e.dst_node != node.id]
+        for c in self.nodes:
+            if c.kind == "container":
+                kids = c.params.get("_children")
+                if kids and node.id in kids:
+                    kids.remove(node.id)
         self.nodes.remove(node)
         self.nodes_by_id.pop(node.id, None)
         self.selected_ids.discard(node.id)
@@ -366,16 +373,39 @@ class FlowApp:
     # ── Container ────────────────────────────────────────────────────────────
 
     def _container_children(self, container: Node) -> list[Node]:
+        ids = container.params.get("_children", [])
+        return [self.nodes_by_id[i] for i in ids if i in self.nodes_by_id]
+
+    def _node_in_container(self, node: Node, container: Node) -> bool:
         w = container.params.get("_w", CONTAINER_DEFAULT_W)
         h = container.params.get("_h", CONTAINER_DEFAULT_H)
-        return [
-            n
-            for n in self.nodes
-            if n.id != container.id
-            and n.kind != "container"
-            and container.x <= n.x <= container.x + w
-            and container.y <= n.y <= container.y + h
-        ]
+        return (
+            container.x <= node.x <= container.x + w
+            and container.y <= node.y <= container.y + h
+        )
+
+    def _container_containing(self, node: Node) -> Node | None:
+        for c in self.nodes:
+            if c.kind == "container" and c.id != node.id and self._node_in_container(node, c):
+                return c
+        return None
+
+    def _update_node_membership(self, node: Node) -> None:
+        """Recompute which container (if any) owns ``node`` based on its position.
+
+        Called only when a node is added or actually dragged — never on container
+        resize — so resizing a container never silently adopts a node beneath it.
+        """
+        if node.kind == "container":
+            return
+        for c in self.nodes:
+            if c.kind == "container":
+                kids = c.params.get("_children")
+                if kids and node.id in kids:
+                    kids.remove(node.id)
+        parent = self._container_containing(node)
+        if parent is not None:
+            parent.params.setdefault("_children", []).append(node.id)
 
     def _collapse_container(self, container: Node) -> None:
         children = self._container_children(container)

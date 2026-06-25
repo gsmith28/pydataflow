@@ -27,6 +27,7 @@ class CanvasController:
 
     def __init__(self, app: FlowApp) -> None:
         self.app = app
+        self._drag_moved = False
 
     # ── Coordinate helpers ────────────────────────────────────────────────
     def s2w(self, sx: float, sy: float) -> tuple[float, float]:
@@ -131,6 +132,7 @@ class CanvasController:
             app._select_node(node)
             wx, wy = self.s2w(event.x, event.y)
             app.drag_node = node
+            self._drag_moved = False
             app.drag_offset_x = wx - node.x
             app.drag_offset_y = wy - node.y
             if node.kind == "container" and not node.params.get("collapsed"):
@@ -159,6 +161,7 @@ class CanvasController:
             )
             app.redraw()
         elif app.drag_node:
+            self._drag_moved = True
             wx, wy = self.s2w(event.x, event.y)
             app.drag_node.x = wx - app.drag_offset_x
             app.drag_node.y = wy - app.drag_offset_y
@@ -205,6 +208,9 @@ class CanvasController:
                     app._add_edge(src_n, src_p, n, port)
                 elif src_d == "in" and dst_d == "out":
                     app._add_edge(n, port, src_n, src_p)
+        dragged = app.drag_node
+        if dragged is not None and self._drag_moved and dragged.kind != "container":
+            app._update_node_membership(dragged)
         self.reset_interaction()
         app.redraw()
 

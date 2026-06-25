@@ -420,11 +420,5 @@ def _hidden_ids(app) -> set:
     hidden: set = set()
     for node in app.nodes:
         if node.kind == "container" and node.params.get("collapsed"):
-            w = node.params.get("_w", CONTAINER_DEFAULT_W)
-            h = node.params.get("_h", CONTAINER_DEFAULT_H)
-            for other in app.nodes:
-                if other.id == node.id or other.kind == "container":
-                    continue
-                if node.x <= other.x <= node.x + w and node.y <= other.y <= node.y + h:
-                    hidden.add(other.id)
+            hidden.update(node.params.get("_child_offsets", {}).keys())
     return hidden
