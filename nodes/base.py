@@ -9,7 +9,17 @@ methods: build_config, execute, to_code.
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Callable
 from tkinter import filedialog, ttk
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
+
+# Called by config widgets after every param edit so the canvas redraws.
+OnChange = Callable[[], None]
+# Engine logger: log(message, level="info").
+Log = Callable[..., None]
 
 
 class BaseTool:
@@ -43,7 +53,11 @@ class BaseTool:
     # --- contract methods ---------------------------------------------------
 
     def build_config(
-        self, parent: tk.Widget, params: dict, on_change, columns: list[str] | None = None
+        self,
+        parent: tk.Widget,
+        params: dict,
+        on_change: OnChange,
+        columns: list[str] | None = None,
     ) -> None:
         """Build the configuration UI for this tool into *parent*.
 
@@ -54,7 +68,9 @@ class BaseTool:
         pass to column-aware widgets (dropdowns, multiselects).
         """
 
-    def execute(self, params: dict, inputs: dict, log) -> dict:
+    def execute(
+        self, params: dict, inputs: dict[str, pd.DataFrame], log: Log
+    ) -> dict[str, pd.DataFrame]:
         """Run the transformation and return outputs.
 
         *inputs* maps input port name → DataFrame (may be empty for source nodes).
