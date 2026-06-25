@@ -82,3 +82,25 @@ def test_generated_code_is_executable(tmp_path):
     result_df = ns[true_var]
     assert len(result_df) == 2
     assert set(result_df["name"]) == {"Alice", "Carol"}
+
+
+def test_generated_group_by_honors_alias(tmp_path):
+    """Exported GroupBy code must name columns with the alias, matching execute()."""
+    csv = tmp_path / "data.csv"
+    csv.write_text("dept,salary\nEng,90\nEng,95\nHR,55\n")
+
+    n1 = _csv_node(str(csv))
+    n2 = Node("group_by", 200, 0)
+    n2.params["group_cols"] = ["dept"]
+    n2.params["aggs"] = [{"column": "salary", "func": "sum", "alias": "total_salary"}]
+
+    code = generate_python([n1, n2], [Edge(n1.id, "data", n2.id, "data")])
+
+    ns: dict = {}
+    exec(compile(code, "<generated>", "exec"), ns)  # noqa: S102
+
+    out_var = f"df_group_by_{n2.id}"
+    assert out_var in ns, f"Expected {out_var!r} in exported namespace; got {list(ns)}"
+    result_df = ns[out_var].set_index("dept")
+    assert "total_salary" in result_df.columns
+    assert result_df.loc["Eng", "total_salary"] == 185

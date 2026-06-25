@@ -119,7 +119,8 @@ class GroupBy(BaseTool):
             else:
                 result = df.groupby(group_cols).agg(agg_dict).reset_index()
                 result.columns = [
-                    "_".join(c).rstrip("_") if isinstance(c, tuple) else c for c in result.columns
+                    aliases.get(c, "_".join(c).rstrip("_")) if isinstance(c, tuple) else c
+                    for c in result.columns
                 ]
         log(f"Group By: {len(result)} groups")
         return {"data": result}
@@ -131,16 +132,30 @@ class GroupBy(BaseTool):
         if not aggs:
             return [f"{output_var} = {iv}.groupby({group_cols!r}).size().reset_index(name='count')"]
         agg_dict: dict = {}
+        aliases: dict = {}
         for a in aggs:
             col = a.get("column")
             func = a.get("func", "sum")
             if col:
                 agg_dict.setdefault(col, [])
                 agg_dict[col].append(func)
+                alias = a.get("alias")
+                if alias:
+                    aliases[(col, func)] = alias
         lines = [
             f"{output_var} = {iv}.groupby({group_cols!r}).agg({agg_dict!r}).reset_index()",
-            f"{output_var}.columns = ['_'.join(c).rstrip('_') if isinstance(c, tuple) else c for c in {output_var}.columns]",
         ]
+        if aliases:
+            lines.append(f"_aliases = {aliases!r}")
+            lines.append(
+                f"{output_var}.columns = [_aliases.get(c, '_'.join(c).rstrip('_')) "
+                f"if isinstance(c, tuple) else c for c in {output_var}.columns]"
+            )
+        else:
+            lines.append(
+                f"{output_var}.columns = ['_'.join(c).rstrip('_') if isinstance(c, tuple) "
+                f"else c for c in {output_var}.columns]"
+            )
         return lines
 
     def subtitle(self, params):

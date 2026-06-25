@@ -177,9 +177,22 @@ def test_group_by_sum(simple_df):
         {"data": simple_df},
     )
     df = result["data"].set_index("dept")
-    # Column is named salary_sum (alias not yet applied — see ROADMAP)
+    assert df.loc["Eng", "total_salary"] == 90000 + 95000
+    assert df.loc["HR", "total_salary"] == 55000 + 60000
+
+
+def test_group_by_default_column_name(simple_df):
+    # No alias supplied → column falls back to <col>_<func>
+    result = exe(
+        "group_by",
+        {
+            "group_cols": ["dept"],
+            "aggs": [{"column": "salary", "func": "sum", "alias": ""}],
+        },
+        {"data": simple_df},
+    )
+    df = result["data"].set_index("dept")
     assert df.loc["Eng", "salary_sum"] == 90000 + 95000
-    assert df.loc["HR", "salary_sum"] == 55000 + 60000
 
 
 def test_group_by_count(simple_df):
@@ -192,9 +205,8 @@ def test_group_by_count(simple_df):
         {"data": simple_df},
     )
     df = result["data"].set_index("dept")
-    # Column is named name_count (alias not yet applied — see ROADMAP)
-    assert df.loc["Eng", "name_count"] == 2
-    assert df.loc["HR", "name_count"] == 2
+    assert df.loc["Eng", "headcount"] == 2
+    assert df.loc["HR", "headcount"] == 2
 
 
 # ---------------------------------------------------------------------------
