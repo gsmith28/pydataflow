@@ -10,7 +10,6 @@ Each node's output is stored on node.result as dict[port_name, DataFrame].
 
 from __future__ import annotations
 
-import time
 import uuid
 from collections import defaultdict, deque
 from collections.abc import Callable
@@ -99,8 +98,6 @@ def execute_flow(
 
     Returns a dict mapping node_id → output dict (same as node.result).
     Raises ValueError if the graph contains a cycle.
-    Returns dict of node_id -> result_dict.
-    Raises ValueError on cycle.
     """
 
     def _log(msg: str, level: str = "info") -> None:
@@ -115,15 +112,10 @@ def execute_flow(
         _log(str(e), "error")
         raise
 
-    {n.id: n for n in nodes}
-
     # Build edge map: dst_node -> list[(src_node, src_port, dst_port)]
     edge_map: dict[str, list[tuple]] = defaultdict(list)
     for e in edges:
         edge_map[e.dst_node].append((e.src_node, e.src_port, e.dst_port))
-
-    uuid.uuid4().hex[:8]
-    history: list[dict] = []
 
     for node in ordered:
         if node.disabled:
@@ -144,25 +136,12 @@ def execute_flow(
             if df is not None:
                 inputs[dst_port] = df
 
-        t0 = time.monotonic()
         try:
             out = tool.execute(node.params, inputs, _log)
         except Exception as e:
-            msg = f"[{node.kind}] Error: {e}"
-            _log(msg, "error")
+            _log(f"[{node.kind}] Error: {e}", "error")
             node.result = None
-            history.append(
-                {
-                    "node": node.id,
-                    "kind": node.kind,
-                    "status": "error",
-                    "error": str(e),
-                    "elapsed_ms": 0,
-                }
-            )
             continue
-
-        elapsed = (time.monotonic() - t0) * 1000
 
         # Normalise output
         if isinstance(out, pd.DataFrame):
@@ -174,9 +153,5 @@ def execute_flow(
         for port, df in out.items():
             if isinstance(df, pd.DataFrame):
                 _log(f"[{node.kind}] {port}: {len(df)} rows × {len(df.columns)} cols")
-
-        history.append(
-            {"node": node.id, "kind": node.kind, "status": "ok", "elapsed_ms": round(elapsed, 1)}
-        )
 
     return results
