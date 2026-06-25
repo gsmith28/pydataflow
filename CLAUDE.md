@@ -39,8 +39,7 @@ pydataflow/
 ├── tests/               # pytest suite
 ├── pyproject.toml       # Deps: pandas>=2.0, openpyxl>=3.1; ruff; pytest
 ├── README.md            # Developer quickstart + architecture
-├── ROADMAP.md           # Planned enhancements
-└── backend/             # ⚠ DEAD CODE — prior NiceGUI/FastAPI prototype, not used
+└── ROADMAP.md           # Planned enhancements
 ```
 
 ---
@@ -117,7 +116,6 @@ The canvas has two spaces:
 
 ## Things NOT to do
 
-- **Do not touch `backend/`** — it's a prior NiceGUI prototype and is dead code. Changes there have no effect on the running app.
 - **Do not move files into a package** — imports use `sys.path.insert` at the root level. Restructuring would break all relative imports.
 - **Do not add pip dependencies** beyond what's in `pyproject.toml` without updating it.
 
@@ -146,10 +144,9 @@ ruff format .
 
 ---
 
-## Current known gaps (as of initial review)
+## Current known gaps
 
-- `app.py` is 850+ lines and handles too many concerns — splitting is deferred until test coverage exists
+- `app.py` is 850+ lines and handles too many concerns — splitting is deferred until test coverage improves
 - `nodes/preparation.py` is 710+ lines with 9 classes — same deferral rationale
-- The delimiter map `{"comma": ",", ...}` is duplicated in `input_output.py` and `column_inference.py` — should move to `constants.py`
+- `GroupBy` alias field is computed but never applied — output columns are named `<col>_<func>` regardless of alias
 - No CI/CD pipeline configured yet
-- Test coverage is minimal (see `tests/`)
