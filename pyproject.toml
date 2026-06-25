@@ -42,9 +42,6 @@ ignore = [
     "B008",  # do not perform function calls in default args
 ]
 
-[tool.ruff.lint.per-file-ignores]
-"nodes/preparation.py" = ["B007"]  # loop variable not used in body (dynamic row builders)
-
 # ---------------------------------------------------------------------------
 # Pytest
 # ---------------------------------------------------------------------------

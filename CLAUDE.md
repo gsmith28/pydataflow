@@ -32,7 +32,8 @@ pydataflow/
 │   ├── __init__.py      # Registry: get_tool(kind) → BaseTool | None
 │   ├── base.py          # BaseTool abstract class + widget builder helpers
 │   ├── input_output.py  # ImportCSV, ImportExcel, ShowTable, ExportCSV, ExportExcel
-│   ├── preparation.py   # 9 tools: filter, sort, select, rename, cleanse, etc.
+│   ├── columns.py       # SelectColumns, RenameColumns, EditColumns, AddColumns, Cleansing, RecordID
+│   ├── rows.py          # FilterRows, Sort, HeadTail
 │   ├── join.py          # MergeJoin, Union, UniqueDuplicate
 │   ├── transform.py     # Summarize, GroupBy, Pivot, Unpivot
 │   └── documentation.py # Comment, Container (visual-only, no data flow)
@@ -146,7 +147,6 @@ ruff format .
 
 ## Current known gaps
 
-- `app.py` is 850+ lines and handles too many concerns — splitting is deferred until test coverage improves
-- `nodes/preparation.py` is 710+ lines with 9 classes — same deferral rationale
+- `app.py` is 900+ lines and handles too many concerns — splitting is the next refactoring target
 - `GroupBy` alias field is computed but never applied — output columns are named `<col>_<func>` regardless of alias
 - No CI/CD pipeline configured yet

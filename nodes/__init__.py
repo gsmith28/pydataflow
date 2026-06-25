@@ -8,20 +8,18 @@ Imports all built-in tool classes, instantiates them, and exposes:
 To register a new tool: add it to the import list and to _tools below.
 """
 
-from nodes.documentation import Comment, Container
-from nodes.input_output import ExportCSV, ExportExcel, ImportCSV, ImportExcel, ShowTable
-from nodes.join import MergeJoin, Union, UniqueDuplicate
-from nodes.preparation import (
+from nodes.columns import (
     AddColumns,
     Cleansing,
     EditColumns,
-    FilterRows,
-    HeadTail,
     RecordID,
     RenameColumns,
     SelectColumns,
-    Sort,
 )
+from nodes.documentation import Comment, Container
+from nodes.input_output import ExportCSV, ExportExcel, ImportCSV, ImportExcel, ShowTable
+from nodes.join import MergeJoin, Union, UniqueDuplicate
+from nodes.rows import FilterRows, HeadTail, Sort
 from nodes.transform import GroupBy, Pivot, Summarize, Unpivot
 
 _tools: list = [

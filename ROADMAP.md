@@ -14,7 +14,7 @@ These are not visible to users but make the codebase safer to extend.
 - [ ] **Extract `BaseTool._normalize_columns()`** — the pattern of coercing a `params` value to a `list[str]` appears 6+ times across nodes. Belongs on `BaseTool`.
 - [ ] **Add type hints to `BaseTool` contract** — `build_config`, `execute`, and `to_code` signatures should be fully typed so subclasses get IDE support.
 - [ ] **Split `app.py`** — currently 850 lines covering event handling, graph ops, project I/O, and UI construction. Target: `canvas_controller.py` (events + zoom/pan), leave `app.py` as the thin orchestrator. _Blocked on test coverage._
-- [ ] **Split `nodes/preparation.py`** — 710 lines, 9 classes. Could be split by concern: `nodes/filter.py`, `nodes/reshape.py`, etc. _Blocked on test coverage._
+- [x] **Split `nodes/preparation.py`** — split by concern into `nodes/columns.py` (select, rename, retype, derive, cleanse, record id) and `nodes/rows.py` (filter, sort, head/tail).
 - [ ] **Typed `node.params`** — currently `dict[str, Any]`. Defining per-tool param dataclasses (or TypedDicts) would enable validation and IDE completion.
 - [ ] **Custom exception type** — replace bare `raise ValueError(...)` in tool execute methods with a `FlowExecutionError` that carries the node ID, enabling better error display.
 

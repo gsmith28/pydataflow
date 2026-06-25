@@ -61,7 +61,8 @@ pydataflow/
 │   ├── __init__.py      # Tool registry: get_tool(), all_tools()
 │   ├── base.py          # BaseTool abstract class + widget helpers
 │   ├── input_output.py  # Import/export tools
-│   ├── preparation.py   # Filtering, sorting, reshaping tools
+│   ├── columns.py       # Column tools: select, rename, retype, derive, cleanse, record id
+│   ├── rows.py          # Row tools: filter, sort, head/tail
 │   ├── join.py          # Merge, union, deduplication tools
 │   ├── transform.py     # Aggregation and pivot tools
 │   └── documentation.py # Comment and Container (visual only)
