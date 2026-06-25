@@ -1,3 +1,12 @@
+"""
+Project persistence for PyDataFlow.
+
+save_project(path, nodes, edges) — serialise graph to JSON (format v3).
+load_project(path) → (nodes, edges) — deserialise from JSON.
+
+The file format is intentionally simple and human-readable so pipelines
+can be reviewed and diffed in version control.
+"""
 from __future__ import annotations
 import json
 from pathlib import Path

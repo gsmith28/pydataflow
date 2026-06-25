@@ -1,3 +1,12 @@
+"""
+Execution engine for PyDataFlow.
+
+Provides two public functions:
+  - topological_sort(nodes, edges) → ordered list of nodes (raises on cycles)
+  - execute_flow(nodes, edges, log) → runs all non-disabled nodes in dependency order
+
+Each node's output is stored on node.result as dict[port_name, DataFrame].
+"""
 from __future__ import annotations
 import time
 import uuid
@@ -38,6 +47,13 @@ class Edge:
 
 
 def topological_sort(nodes: list[Node], edges: list[Edge]) -> list[Node]:
+    """Return nodes in execution order using Kahn's algorithm.
+
+    Edges that reference node IDs not in `nodes` are silently ignored (dangling
+    references from a partially-deleted graph).
+
+    Raises ValueError if a cycle is detected.
+    """
     all_ids = {n.id for n in nodes}
     in_deg: dict[str, int] = {n.id: 0 for n in nodes}
     adj: dict[str, list[str]] = defaultdict(list)
@@ -64,8 +80,14 @@ def topological_sort(nodes: list[Node], edges: list[Edge]) -> list[Node]:
 
 def execute_flow(nodes: list[Node], edges: list[Edge],
                  log: Callable[[str, str], None] | None = None) -> dict:
-    """
-    Run all non-disabled nodes in topological order.
+    """Run all non-disabled nodes in topological order.
+
+    Each node's result dict is stored on node.result after execution.
+    On tool error the node is skipped and the error is logged; downstream
+    nodes receive no input from that port and will likely also fail.
+
+    Returns a dict mapping node_id → output dict (same as node.result).
+    Raises ValueError if the graph contains a cycle.
     Returns dict of node_id -> result_dict.
     Raises ValueError on cycle.
     """

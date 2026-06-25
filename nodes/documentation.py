@@ -1,3 +1,8 @@
+"""Documentation tool nodes: Comment and Container.
+
+These are visual-only nodes (is_visual_only = True) — they have no input/output
+ports and never participate in data flow or code export.
+"""
 from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk, colorchooser

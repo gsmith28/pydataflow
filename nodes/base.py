@@ -1,3 +1,10 @@
+"""
+Base class and widget helpers for all PyDataFlow tool nodes.
+
+Every tool is a subclass of BaseTool registered in nodes/__init__.py.
+Subclasses must set the class attributes and override the three contract
+methods: build_config, execute, to_code.
+"""
 from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk, filedialog
@@ -5,6 +12,26 @@ from typing import Any
 
 
 class BaseTool:
+    """Abstract base for all PyDataFlow tool nodes.
+
+    Subclass contract
+    -----------------
+    Set class attributes:
+        node_type     -- unique snake_case key used in the registry and .json files
+        display_name  -- shown in the palette and node header
+        color         -- hex colour for palette indicator and node border
+        ins           -- ordered list of input port names, e.g. ["data"]
+        outs          -- ordered list of output port names, e.g. ["true", "false"]
+
+    Override the three contract methods:
+        build_config  -- build tkinter widgets into the properties panel
+        execute       -- run the transformation, return {port: DataFrame}
+        to_code       -- return Python source lines for the export script
+
+    Widget helpers (add_entry, add_combobox, etc.) handle widget layout and
+    keep params in sync. Call them inside build_config.
+    """
+
     node_type: str = ""
     display_name: str = ""
     color: str = "#4a9eff"
@@ -16,16 +43,42 @@ class BaseTool:
 
     def build_config(self, parent: tk.Widget, params: dict,
                      on_change, columns: list[str] | None = None) -> None:
-        pass
+        """Build the configuration UI for this tool into *parent*.
+
+        *params* is mutated in place as the user edits widgets.
+        *on_change* must be called after every param update so the canvas
+        redraws the subtitle and marks the project dirty.
+        *columns* is the list of column names inferred from upstream data;
+        pass to column-aware widgets (dropdowns, multiselects).
+        """
 
     def execute(self, params: dict, inputs: dict, log) -> dict:
+        """Run the transformation and return outputs.
+
+        *inputs* maps input port name → DataFrame (may be empty for source nodes).
+        *log* is a callable: log(message: str, level: str = "info").
+
+        Return a dict mapping output port name → DataFrame.
+        Raise ValueError with a user-readable message on misconfiguration.
+        """
         return {}
 
     def to_code(self, params: dict, input_vars: list[str],
                 output_var: str, connected_outs: list[str] | None = None) -> list[str]:
+        """Return Python source lines equivalent to execute() for export.
+
+        *input_vars*     -- variable names for each input port (same order as self.ins)
+        *output_var*     -- base variable name to assign outputs to
+        *connected_outs* -- output port names that are wired downstream
+                            (None means emit all ports)
+
+        Multi-output nodes should suffix output_var with the port name,
+        e.g. f"{output_var}_true" and f"{output_var}_false".
+        """
         return []
 
     def subtitle(self, params: dict) -> str:
+        """Return a short summary string shown below the node title on the canvas."""
         return ""
 
     # --- config-widget helpers (use inside build_config) --------------------
