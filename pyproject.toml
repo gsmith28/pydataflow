@@ -1,0 +1,65 @@
+[project]
+name = "pydataflow"
+version = "0.1.0"
+description = "Visual data pipeline builder — drag-and-drop nodes, pandas execution, Python export"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "pandas>=2.0,<3.0",
+    "openpyxl>=3.1",
+]
+
+[project.scripts]
+pydataflow = "main:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+]
+
+# ---------------------------------------------------------------------------
+# Ruff — linting + formatting
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long — handled by formatter
+    "B008",  # do not perform function calls in default args
+]
+
+[tool.ruff.lint.per-file-ignores]
+"nodes/preparation.py" = ["B007"]  # loop variable not used in body (dynamic row builders)
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "--tb=short"
+
+# ---------------------------------------------------------------------------
+# Coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "backend/*"]
+
+[tool.coverage.report]
+show_missing = true
