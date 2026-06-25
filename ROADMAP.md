@@ -13,7 +13,7 @@ These are not visible to users but make the codebase safer to extend.
 - [x] **Extract `DELIM_MAP` to `constants.py`** — single source of truth, used by `input_output.py` and `column_inference.py`.
 - [x] **Extract `BaseTool._normalize_columns()`** — coercion of a `params` value to `list[str]` is now a single helper on `BaseTool`, applied across all node modules.
 - [x] **Add type hints to `BaseTool` contract** — `build_config`, `execute`, `to_code`, and `subtitle` are fully typed (with `OnChange`/`Log` aliases) so subclasses get IDE support.
-- [ ] **Split `app.py`** — currently 850 lines covering event handling, graph ops, project I/O, and UI construction. Target: `canvas_controller.py` (events + zoom/pan), leave `app.py` as the thin orchestrator. _Blocked on test coverage._
+- [x] **Split `app.py`** — canvas interaction (click/drag/wire, zoom/pan, view framing) extracted to `canvas_controller.py`; `app.py` keeps graph ops, palette/properties UI, and project I/O. Verified by manual click-test (GUI has no automated coverage). Further splits (e.g. project I/O) remain possible.
 - [x] **Split `nodes/preparation.py`** — split by concern into `nodes/columns.py` (select, rename, retype, derive, cleanse, record id) and `nodes/rows.py` (filter, sort, head/tail).
 - [ ] **Typed `node.params`** — currently `dict[str, Any]`. Defining per-tool param dataclasses (or TypedDicts) would enable validation and IDE completion.
 - [ ] **Custom exception type** — replace bare `raise ValueError(...)` in tool execute methods with a `FlowExecutionError` that carries the node ID, enabling better error display.
@@ -64,8 +64,10 @@ These are not visible to users but make the codebase safer to extend.
 - [ ] **Auto-layout** — a "tidy layout" button that arranges nodes left-to-right in topological order.
 - [ ] **Edge labels** — show port names on wires when a node has multiple output ports.
 - [ ] **Inline data preview on node** — show row count badge directly on the node after a run (currently only in the properties panel).
+- [x] **Collapsible palette sections** — each category header collapses/expands; the collapsed set persists across sessions via `settings.py`.
+- [x] **Persisted preferences** — `settings.py` stores window geometry, last-used folder for file dialogs, and palette collapsed state in `~/.pydataflow/settings.json`.
 - [ ] **Search palette** — type-to-filter the tool palette rather than scrolling.
-- [ ] **Recent files** — File menu with last 5 opened projects.
+- [ ] **Recent files** — File menu with last 5 opened projects. (`settings.py` already provides the persistence layer to build on.)
 
 ---
 

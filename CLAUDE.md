@@ -20,12 +20,14 @@ A **local desktop data pipeline builder** written in Python. The user drags tool
 ```
 pydataflow/
 ├── main.py              # Entry point — boots FlowApp
-├── app.py               # FlowApp class: 850-line orchestrator (see note below)
+├── app.py               # FlowApp class: orchestrator (window, palette, props, project I/O)
+├── canvas_controller.py # CanvasController: click/drag/wire, zoom/pan, view framing
 ├── engine.py            # Topological sort + execute_flow()
 ├── renderer.py          # Canvas drawing — redraws every frame, no dirty tracking
 ├── properties.py        # Right-hand properties panel, calls tool.build_config()
 ├── column_inference.py  # Traces graph to infer columns without running pipeline
 ├── project_io.py        # save_project() / load_project() — JSON format v3
+├── settings.py          # Per-user prefs (window, last dir, palette) → ~/.pydataflow/
 ├── export_script.py     # generate_python() — emits standalone pandas .py
 ├── constants.py         # Colours, geometry, CATEGORIES list, TOOL_COLORS
 ├── nodes/
@@ -106,8 +108,19 @@ The canvas has two spaces:
 - **World space**: where nodes live (float, unbounded, stored in `node.x`, `node.y`)
 - **Screen space**: `screen = world * zoom + pan`
 
-`FlowApp._s2w(sx, sy)` converts screen → world.  
-`renderer.py` uses `app.zoom`, `app.pan_x`, `app.pan_y` for all transforms.
+`CanvasController.s2w(sx, sy)` converts screen → world.  
+`renderer.py` uses `app.zoom`, `app.pan_x`, `app.pan_y` for all transforms. Interaction
+state (zoom, pan, drag, wire, resize) lives on `FlowApp` so the renderer can read it
+directly each frame; `canvas_controller.py` holds the event-handling *methods* and
+mutates that shared state.
+
+### Container membership
+
+A container "owns" nodes via an explicit `container.params["_children"]` id list — not
+geometry. Membership is recomputed only when a node is added or actually dragged
+(`FlowApp._update_node_membership`), never on container resize, so resizing never silently
+adopts a node beneath it. The container also grows to enclose its children's footprint and
+cannot be resized smaller than it.
 
 ### Column inference
 
@@ -147,4 +160,6 @@ ruff format .
 
 ## Current known gaps
 
-- `app.py` is 900+ lines and handles too many concerns — splitting is the next refactoring target
+- `app.py` still owns several concerns (palette/properties UI, project I/O, logging,
+  preview). Canvas interaction was extracted to `canvas_controller.py`; further splits
+  (e.g. project I/O) are possible but not yet done.

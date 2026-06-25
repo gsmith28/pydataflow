@@ -49,12 +49,14 @@ PyDataFlow presents a node-based canvas (think Alteryx or Tableau Prep, but pure
 ```
 pydataflow/
 ├── main.py              # Entry point — boots FlowApp
-├── app.py               # FlowApp: main window, event handling, orchestration
+├── app.py               # FlowApp: main window, palette/properties, orchestration
+├── canvas_controller.py # Canvas interaction: click/drag/wire, zoom/pan, view framing
 ├── engine.py            # Topological sort + flow execution
 ├── renderer.py          # Canvas drawing: nodes, edges, ports, bezier curves
 ├── properties.py        # Right-hand properties panel
 ├── column_inference.py  # Traces upstream nodes to infer available columns
 ├── project_io.py        # Save/load .json project files
+├── settings.py          # Per-user prefs persisted to ~/.pydataflow/settings.json
 ├── export_script.py     # Generate standalone pandas .py scripts
 ├── constants.py         # UI colours, geometry, tool categories
 ├── nodes/
@@ -104,7 +106,7 @@ The canvas is a raw `tkinter.Canvas`. `renderer.py` redraws it on every frame (n
 - **World space**: where nodes actually are (float, unbounded)
 - **Screen space**: world × zoom + pan offset
 
-`Renderer.hit_test()` maps a mouse event back to world space to determine what was clicked (node title, port, resize handle, background).
+`Renderer.hit_test()` maps a mouse event back to world space to determine what was clicked (node title, port, resize handle, background). `canvas_controller.py` owns the interaction logic — click/drag/wire, zoom/pan, and view framing — operating on shared state that still lives on `FlowApp` (so `renderer.py` keeps reading `app.zoom`/`app.pan_x`/`app.pan_y` directly).
 
 ---
 
