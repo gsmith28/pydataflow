@@ -1,3 +1,9 @@
+"""
+Preparation tool nodes (9 tools).
+
+SelectColumns, FilterRows, Sort, HeadTail, RenameColumns,
+EditColumns, AddColumns, Cleansing, RecordID.
+"""
 from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
@@ -250,7 +256,7 @@ class FilterRows(BaseTool):
             exprs   = [self._cond_to_expr(iv, c) for c in conditions]
             mask_expr = join.join(exprs)
         else:
-            mask_expr = "pd.Series(True, index={iv}.index)"
+            mask_expr = f"pd.Series(True, index={iv}.index)"
         lines = [f"_mask = {mask_expr}"]
         if "true"  in outs: lines.append(f"{output_var}_true  = {iv}[_mask].reset_index(drop=True)")
         if "false" in outs: lines.append(f"{output_var}_false = {iv}[~_mask].reset_index(drop=True)")

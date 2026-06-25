@@ -1,3 +1,11 @@
+"""
+Properties panel for PyDataFlow.
+
+PropertiesPanel is the right-hand panel in the main window. When a node is
+selected it calls tool.build_config() to populate the panel with that tool's
+configuration widgets, then shows execution results (row/col counts) and a
+live-updating code preview.
+"""
 from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk

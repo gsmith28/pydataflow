@@ -1,3 +1,14 @@
+"""
+Canvas renderer for PyDataFlow.
+
+Redraws the entire tkinter Canvas on every call to Renderer.redraw().
+Handles: background grid, container boxes, bezier edge wires, nodes
+(with ports, title, subtitle, result badge), and the in-progress wire
+while the user is dragging a connection.
+
+Also provides Renderer.hit_test() which maps a screen-space mouse
+coordinate back to (node, hit_type, port_name).
+"""
 from __future__ import annotations
 import math
 import tkinter as tk

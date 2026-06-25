@@ -1,3 +1,4 @@
+"""Join / Reconcile tool nodes: MergeJoin, Union, UniqueDuplicate."""
 from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
