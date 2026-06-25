@@ -149,4 +149,3 @@ ruff format .
 
 - `app.py` is 900+ lines and handles too many concerns — splitting is the next refactoring target
 - `GroupBy` alias field is computed but never applied — output columns are named `<col>_<func>` regardless of alias
-- No CI/CD pipeline configured yet

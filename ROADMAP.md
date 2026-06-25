@@ -10,9 +10,9 @@ Status labels: `[ ]` not started · `[~]` in progress · `[x]` done
 
 These are not visible to users but make the codebase safer to extend.
 
-- [ ] **Extract `DELIM_MAP` to `constants.py`** — the delimiter mapping (`"comma" → ","`, etc.) is duplicated in `input_output.py` and `column_inference.py`. One source of truth.
-- [ ] **Extract `BaseTool._normalize_columns()`** — the pattern of coercing a `params` value to a `list[str]` appears 6+ times across nodes. Belongs on `BaseTool`.
-- [ ] **Add type hints to `BaseTool` contract** — `build_config`, `execute`, and `to_code` signatures should be fully typed so subclasses get IDE support.
+- [x] **Extract `DELIM_MAP` to `constants.py`** — single source of truth, used by `input_output.py` and `column_inference.py`.
+- [x] **Extract `BaseTool._normalize_columns()`** — coercion of a `params` value to `list[str]` is now a single helper on `BaseTool`, applied across all node modules.
+- [x] **Add type hints to `BaseTool` contract** — `build_config`, `execute`, `to_code`, and `subtitle` are fully typed (with `OnChange`/`Log` aliases) so subclasses get IDE support.
 - [ ] **Split `app.py`** — currently 850 lines covering event handling, graph ops, project I/O, and UI construction. Target: `canvas_controller.py` (events + zoom/pan), leave `app.py` as the thin orchestrator. _Blocked on test coverage._
 - [x] **Split `nodes/preparation.py`** — split by concern into `nodes/columns.py` (select, rename, retype, derive, cleanse, record id) and `nodes/rows.py` (filter, sort, head/tail).
 - [ ] **Typed `node.params`** — currently `dict[str, Any]`. Defining per-tool param dataclasses (or TypedDicts) would enable validation and IDE completion.
@@ -27,7 +27,7 @@ These are not visible to users but make the codebase safer to extend.
 - [ ] **`tests/test_export.py`** — generate_python() round-trip: build a small graph, export, exec the output, compare DataFrames
 - [ ] **`tests/test_project_io.py`** — save/load round-trip, version field, malformed JSON
 - [ ] **`tests/test_column_inference.py`** — column propagation through select, filter, join
-- [ ] **CI via GitHub Actions** — run `pytest` and `ruff check` on every push and PR
+- [x] **CI via GitHub Actions** — runs `ruff check` and `pytest` on every push and PR (`.github/workflows/ci.yml`).
 
 ---
 
