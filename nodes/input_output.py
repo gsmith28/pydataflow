@@ -1,9 +1,11 @@
+"""Input / Output tool nodes: Import CSV, Import Excel, Show Table, Export CSV, Export Excel."""
 from __future__ import annotations
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 import pandas as pd
 from nodes.base import BaseTool
+from constants import DELIM_MAP
 
 
 class ImportCSV(BaseTool):
@@ -25,18 +27,18 @@ class ImportCSV(BaseTool):
         path = params.get("file_path", "")
         if not path or not os.path.exists(path):
             raise ValueError(f"File not found: {path}")
-        delim_map = {"comma": ",", "tab": "\t", "pipe": "|", "semicolon": ";"}
         dm = params.get("delimiter", "comma")
-        sep = delim_map.get(dm, params.get("custom_delim", ",") or ",")
+        sep = DELIM_MAP.get(dm, params.get("custom_delim", ",") or ",")
         df = pd.read_csv(path, sep=sep, skip_blank_lines=bool(params.get("skip_blank", True)))
         log(f"Loaded {len(df)} rows × {len(df.columns)} cols from {os.path.basename(path)}")
         return {"data": df}
 
     def to_code(self, params, input_vars, output_var, connected_outs=None):
         path = params.get("file_path", "")
-        delim_map = {"comma": ",", "tab": "\\t", "pipe": "|", "semicolon": ";"}
+        # to_code emits a literal string, so \t must be escaped for the output script
+        code_delim_map = {**DELIM_MAP, "tab": "\\t"}
         dm = params.get("delimiter", "comma")
-        sep = delim_map.get(dm, params.get("custom_delim", ",") or ",")
+        sep = code_delim_map.get(dm, params.get("custom_delim", ",") or ",")
         skip = "True" if params.get("skip_blank", True) else "False"
         return [f'{output_var} = pd.read_csv(r"{path}", sep="{sep}", skip_blank_lines={skip})']
 

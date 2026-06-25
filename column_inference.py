@@ -1,3 +1,14 @@
+"""
+Column inference for PyDataFlow.
+
+infer_columns(app, node, port_index) traces the graph upstream from a node
+to determine which column names are available at a given input port, without
+requiring a full pipeline execution.
+
+For CSV/Excel import nodes it reads file headers directly.
+For other nodes it uses cached node.result if the pipeline has been run,
+or propagates column lists through pass-through tools (SelectColumns, etc.).
+"""
 from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
@@ -42,10 +53,9 @@ def _cols_from_node(node, port: str, nodes: list, edges: list) -> list[str]:
         if path and os.path.exists(path):
             try:
                 import pandas as pd
-                from constants import TOOL_COLORS  # noqa: just a guard
+                from constants import DELIM_MAP
                 dm = node.params.get("delimiter", "comma")
-                sep_map = {"comma": ",", "tab": "\t", "pipe": "|", "semicolon": ";"}
-                sep = sep_map.get(dm, node.params.get("custom_delim", ",") or ",")
+                sep = DELIM_MAP.get(dm, node.params.get("custom_delim", ",") or ",")
                 df = pd.read_csv(path, sep=sep, nrows=0)
                 return list(df.columns)
             except Exception:
