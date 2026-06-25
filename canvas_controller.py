@@ -178,8 +178,9 @@ class CanvasController:
         elif app.resizing:
             dx = (event.x - app.resize_start_mouse[0]) / app.zoom
             dy = (event.y - app.resize_start_mouse[1]) / app.zoom
-            app.resizing.params["_w"] = max(80, app.resize_start_size[0] + dx)
-            app.resizing.params["_h"] = max(50, app.resize_start_size[1] + dy)
+            min_w, min_h = app._container_min_size(app.resizing)
+            app.resizing.params["_w"] = max(min_w, app.resize_start_size[0] + dx)
+            app.resizing.params["_h"] = max(min_h, app.resize_start_size[1] + dy)
             app.mark_dirty()
             app.redraw()
         else:

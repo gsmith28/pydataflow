@@ -15,6 +15,8 @@ from constants import (
     DARK_BG,
     DIM_FG,
     ENTRY_BG,
+    NODE_H,
+    NODE_W,
     PANEL_BG,
     SELECT_OUTLINE,
     TEXT_FG,
@@ -406,6 +408,32 @@ class FlowApp:
         parent = self._container_containing(node)
         if parent is not None:
             parent.params.setdefault("_children", []).append(node.id)
+            self._grow_container_to_fit(parent)
+
+    def _grow_container_to_fit(self, container: Node) -> None:
+        """Expand the container so it fully encloses its children's footprint.
+
+        Grow-only: a child dragged to or past an edge pushes the boundary out,
+        but this never shrinks the container (manual resize handles that).
+        """
+        min_w, min_h = self._container_min_size(container)
+        container.params["_w"] = max(container.params.get("_w", CONTAINER_DEFAULT_W), min_w)
+        container.params["_h"] = max(container.params.get("_h", CONTAINER_DEFAULT_H), min_h)
+
+    def _container_min_size(self, container: Node) -> tuple[float, float]:
+        """Smallest (w, h) that still encloses every child node's footprint.
+
+        The resize handle is the bottom-right corner, so the container's top-left
+        stays put; the minimum is driven by how far each child extends right/down.
+        Falls back to the absolute floor (80, 50) when there are no children.
+        """
+        children = self._container_children(container)
+        if not children:
+            return 80.0, 50.0
+        pad = 12.0
+        min_w = max(c.x + NODE_W - container.x for c in children) + pad
+        min_h = max(c.y + NODE_H - container.y for c in children) + pad
+        return max(80.0, min_w), max(50.0, min_h)
 
     def _collapse_container(self, container: Node) -> None:
         children = self._container_children(container)
