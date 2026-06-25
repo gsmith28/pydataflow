@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import export_script
 import project_io
+from canvas_controller import CanvasController
 from constants import (
     CANVAS_BG,
     CATEGORIES,
@@ -14,8 +15,6 @@ from constants import (
     DARK_BG,
     DIM_FG,
     ENTRY_BG,
-    NODE_H,
-    NODE_W,
     PANEL_BG,
     SELECT_OUTLINE,
     TEXT_FG,
@@ -77,6 +76,8 @@ class FlowApp:
         # palette drag-to-canvas
         self.palette_drag_kind: str | None = None
         self.palette_drag_ghost: tk.Toplevel | None = None
+
+        self.controller = CanvasController(self)
 
         self._apply_theme()
         self._build_ui()
@@ -196,8 +197,8 @@ class FlowApp:
         btn("Export .py", self.export_python)
         btn("Clear", self.clear_canvas)
         ttk.Separator(tb, orient="vertical").pack(side="left", fill="y", padx=4, pady=6)
-        btn("Fit", self.fit_view)
-        btn("1:1", self.reset_zoom)
+        btn("Fit", self.controller.fit_view)
+        btn("1:1", self.controller.reset_zoom)
 
         self._title_var = tk.StringVar(value="PyDataFlow — untitled")
         tk.Label(
@@ -318,13 +319,13 @@ class FlowApp:
         c.bind("<Button-1>", self._on_click)
         c.bind("<B1-Motion>", self._on_drag)
         c.bind("<ButtonRelease-1>", self._on_release)
-        c.bind("<Button-2>", self._start_pan)
-        c.bind("<B2-Motion>", self._do_pan)
+        c.bind("<Button-2>", self.controller.start_pan)
+        c.bind("<B2-Motion>", self.controller.do_pan)
         c.bind("<Button-3>", self._on_right_click)
         c.bind("<Double-Button-1>", self._on_double_click)
-        c.bind("<MouseWheel>", self._on_scroll)  # Windows / macOS
-        c.bind("<Button-4>", lambda e: self._scroll_delta(e, 120))  # Linux up
-        c.bind("<Button-5>", lambda e: self._scroll_delta(e, -120))  # Linux down
+        c.bind("<MouseWheel>", self.controller.on_scroll)  # Windows / macOS
+        c.bind("<Button-4>", lambda e: self.controller.scroll_delta(e, 120))  # Linux up
+        c.bind("<Button-5>", lambda e: self.controller.scroll_delta(e, -120))  # Linux down
 
     # ── Canvas events ────────────────────────────────────────────────────────
 
@@ -350,7 +351,7 @@ class FlowApp:
             )
         elif hit in ("title", "body") and node:
             self._select_node(node)
-            wx, wy = self._s2w(event.x, event.y)
+            wx, wy = self.controller.s2w(event.x, event.y)
             self.drag_node = node
             self.drag_offset_x = wx - node.x
             self.drag_offset_y = wy - node.y
@@ -379,7 +380,7 @@ class FlowApp:
             )
             self.redraw()
         elif self.drag_node:
-            wx, wy = self._s2w(event.x, event.y)
+            wx, wy = self.controller.s2w(event.x, event.y)
             self.drag_node.x = wx - self.drag_offset_x
             self.drag_node.y = wy - self.drag_offset_y
             for child in self.drag_children:
@@ -438,16 +439,6 @@ class FlowApp:
         self.resizing = None
         self.hover_port = None
 
-    def _start_pan(self, event) -> None:
-        self.panning = True
-        self.pan_start = (event.x, event.y)
-        self.pan_start_off = (self.pan_x, self.pan_y)
-
-    def _do_pan(self, event) -> None:
-        self.pan_x = self.pan_start_off[0] + event.x - self.pan_start[0]
-        self.pan_y = self.pan_start_off[1] + event.y - self.pan_start[1]
-        self.redraw()
-
     def _on_right_click(self, event) -> None:
         node, hit, port = self.renderer.hit_test(self, event.x, event.y)
         menu = tk.Menu(
@@ -470,9 +461,9 @@ class FlowApp:
             if node.result:
                 menu.add_command(label="View data…", command=lambda: self.show_table_viewer(node))
         else:
-            menu.add_command(label="Fit view", command=self.fit_view)
-            menu.add_command(label="Reset zoom", command=self.reset_zoom)
-            wx, wy = self._s2w(event.x, event.y)
+            menu.add_command(label="Fit view", command=self.controller.fit_view)
+            menu.add_command(label="Reset zoom", command=self.controller.reset_zoom)
+            wx, wy = self.controller.s2w(event.x, event.y)
             menu.add_separator()
             menu.add_command(
                 label="Add Comment here", command=lambda: self.add_node("comment", wx, wy)
@@ -490,24 +481,6 @@ class FlowApp:
             else:
                 self._collapse_container(node)
             self.redraw()
-
-    def _on_scroll(self, event) -> None:
-        self._scroll_delta(event, event.delta)
-
-    def _scroll_delta(self, event, delta: int) -> None:
-        factor = 1.1 if delta > 0 else (1 / 1.1)
-        new_zoom = max(0.15, min(4.0, self.zoom * factor))
-        wx = (event.x - self.pan_x) / self.zoom
-        wy = (event.y - self.pan_y) / self.zoom
-        self.pan_x = event.x - wx * new_zoom
-        self.pan_y = event.y - wy * new_zoom
-        self.zoom = new_zoom
-        self.redraw()
-
-    # ── Coordinate helpers ────────────────────────────────────────────────────
-
-    def _s2w(self, sx: float, sy: float) -> tuple[float, float]:
-        return (sx - self.pan_x) / self.zoom, (sy - self.pan_y) / self.zoom
 
     # ── Graph operations ─────────────────────────────────────────────────────
 
@@ -647,7 +620,7 @@ class FlowApp:
         if cx <= event.x_root <= cx + cw and cy <= event.y_root <= cy + ch:
             sx = event.x_root - cx
             sy = event.y_root - cy
-            wx, wy = self._s2w(sx, sy)
+            wx, wy = self.controller.s2w(sx, sy)
             self.add_node(kind, wx, wy)
 
     # ── Redraw ───────────────────────────────────────────────────────────────
@@ -823,7 +796,7 @@ class FlowApp:
             self._dirty = False
             self._update_title()
             self._deselect()
-            self.fit_view()
+            self.controller.fit_view()
 
     def export_python(self) -> None:
         path = filedialog.asksaveasfilename(
@@ -846,36 +819,6 @@ class FlowApp:
         self._deselect()
         self._dirty = False
         self._update_title()
-        self.redraw()
-
-    # ── View helpers ─────────────────────────────────────────────────────────
-
-    def fit_view(self) -> None:
-        if not self.nodes:
-            self.pan_x, self.pan_y, self.zoom = 40, 40, 1.0
-            self.redraw()
-            return
-        margin = 60
-        xs = [n.x for n in self.nodes]
-        ys = [n.y for n in self.nodes]
-        x_min, x_max = min(xs), max(xs) + NODE_W + 100
-        y_min, y_max = min(ys), max(ys) + NODE_H + 60
-        cw = self.canvas.winfo_width() or 800
-        ch = self.canvas.winfo_height() or 500
-        available_w = cw - 2 * margin
-        available_h = ch - 2 * margin
-        world_w = x_max - x_min
-        world_h = y_max - y_min
-        if world_w < 1 or world_h < 1:
-            self.zoom = 1.0
-        else:
-            self.zoom = max(0.15, min(2.0, min(available_w / world_w, available_h / world_h)))
-        self.pan_x = margin - x_min * self.zoom
-        self.pan_y = margin - y_min * self.zoom
-        self.redraw()
-
-    def reset_zoom(self) -> None:
-        self.zoom = 1.0
         self.redraw()
 
     # ── Run ──────────────────────────────────────────────────────────────────
