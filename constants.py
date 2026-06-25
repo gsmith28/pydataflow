@@ -1,4 +1,4 @@
-# FlowBuilder — UI constants
+# PyDataFlow — UI constants
 DARK_BG   = "#1e1e2e"
 PANEL_BG  = "#252535"
 CANVAS_BG = "#1a1a2e"
@@ -32,6 +32,13 @@ CATEGORIES = [
     ("Transform / Summarize",["summarize","group_by","pivot","unpivot"]),
     ("Documentation",        ["comment","container"]),
 ]
+
+DELIM_MAP = {
+    "comma": ",",
+    "tab": "\t",
+    "pipe": "|",
+    "semicolon": ";",
+}
 
 TOOL_COLORS = {
     "import_csv":       "#2d9e5a",

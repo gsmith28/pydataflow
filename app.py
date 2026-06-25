@@ -2,7 +2,6 @@ from __future__ import annotations
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from typing import Optional
 
 from constants import (
     DARK_BG, PANEL_BG, CANVAS_BG, TEXT_FG, DIM_FG, ENTRY_BG,
@@ -20,7 +19,7 @@ import export_script
 class FlowApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
-        self.root.title("FlowBuilder")
+        self.root.title("PyDataFlow")
         self.root.geometry("1400x820")
         self.root.minsize(900, 600)
 
@@ -38,17 +37,17 @@ class FlowApp:
         self.pan_y: float = 40.0
 
         # drag
-        self.drag_node: Optional[Node] = None
+        self.drag_node: Node | None = None
         self.drag_offset_x: float = 0.0
         self.drag_offset_y: float = 0.0
         self.drag_children: list[Node] = []
         self.drag_child_offsets: dict = {}
 
         # wire
-        self.wire_start_node: Optional[Node] = None
-        self.wire_start_port: Optional[str] = None
-        self.wire_start_dir: Optional[str] = None
-        self.wire_pos: Optional[tuple] = None
+        self.wire_start_node: Node | None = None
+        self.wire_start_port: str | None = None
+        self.wire_start_dir: str | None = None
+        self.wire_pos: tuple | None = None
 
         # pan
         self.panning: bool = False
@@ -56,17 +55,17 @@ class FlowApp:
         self.pan_start_off: tuple = (0.0, 0.0)
 
         # resize
-        self.resizing: Optional[Node] = None
+        self.resizing: Node | None = None
         self.resize_start_mouse: tuple = (0, 0)
         self.resize_start_size: tuple = (0, 0)
 
         # project
-        self.project_path: Optional[str] = None
+        self.project_path: str | None = None
         self._dirty: bool = False
 
         # palette drag-to-canvas
-        self.palette_drag_kind: Optional[str] = None
-        self.palette_drag_ghost: Optional[tk.Toplevel] = None
+        self.palette_drag_kind: str | None = None
+        self.palette_drag_ghost: tk.Toplevel | None = None
 
         self._apply_theme()
         self._build_ui()
@@ -186,7 +185,7 @@ class FlowApp:
         btn("Fit", self.fit_view)
         btn("1:1", self.reset_zoom)
 
-        self._title_var = tk.StringVar(value="FlowBuilder — untitled")
+        self._title_var = tk.StringVar(value="PyDataFlow — untitled")
         tk.Label(tb, textvariable=self._title_var,
                  bg="#15152a", fg=DIM_FG,
                  font=("Segoe UI", 9)).pack(side="right", padx=12)
@@ -713,7 +712,7 @@ class FlowApp:
     def _update_title(self) -> None:
         name = os.path.basename(self.project_path) if self.project_path else "untitled"
         dirty_star = " *" if self._dirty else ""
-        self._title_var.set(f"FlowBuilder — {name}{dirty_star}")
+        self._title_var.set(f"PyDataFlow — {name}{dirty_star}")
 
     def save_project(self) -> None:
         if not self.project_path:
@@ -727,7 +726,7 @@ class FlowApp:
     def save_project_as(self) -> None:
         path = filedialog.asksaveasfilename(
             defaultextension=".json",
-            filetypes=[("FlowBuilder project", "*.json"), ("All", "*.*")],
+            filetypes=[("PyDataFlow project", "*.json"), ("All", "*.*")],
             title="Save project",
         )
         if path:
@@ -739,7 +738,7 @@ class FlowApp:
                 "Unsaved changes", "Discard unsaved changes?"):
             return
         path = filedialog.askopenfilename(
-            filetypes=[("FlowBuilder project", "*.json"), ("All", "*.*")],
+            filetypes=[("PyDataFlow project", "*.json"), ("All", "*.*")],
             title="Open project",
         )
         if path:
