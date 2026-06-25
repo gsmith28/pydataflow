@@ -351,41 +351,23 @@ class Renderer:
     # ── hit testing ───────────────────────────────────────────────────────
 
     def hit_test(self, app, sx: float, sy: float):
-        """Returns (node | None, hit_type | None, port | None)."""
+        """Returns (node | None, hit_type | None, port | None).
+
+        Regular nodes are tested before containers so hit order matches draw
+        order (containers are drawn behind all regular nodes): a node sitting
+        on top of a container stays clickable.
+        """
         hidden = _hidden_ids(app)
         pr_sq = (PORT_R * app.zoom + 4) ** 2
 
+        # Regular nodes first (drawn on top)
         for node in reversed(app.nodes):
-            if node.id in hidden:
+            if node.kind == "container" or node.id in hidden:
                 continue
             tool = get_tool(node.kind)
             if not tool:
                 continue
 
-            if node.kind == "container":
-                w = node.params.get("_w", CONTAINER_DEFAULT_W)
-                h = node.params.get("_h", CONTAINER_DEFAULT_H)
-                nx, ny = self.w2s(app, node.x, node.y)
-                nw, nh = w * app.zoom, h * app.zoom
-                th = TITLE_H * app.zoom
-                # Resize handle
-                if not node.params.get("collapsed"):
-                    hx, hy = nx + nw - 12, ny + nh - 12
-                    if hx <= sx <= nx + nw and hy <= sy <= ny + nh:
-                        return (node, "resize", None)
-                # Title bar
-                if nx <= sx <= nx + nw and ny <= sy <= ny + th:
-                    return (node, "title", None)
-                # Body
-                if (
-                    not node.params.get("collapsed")
-                    and nx <= sx <= nx + nw
-                    and ny + th <= sy <= ny + nh
-                ):
-                    return (node, "body", None)
-                continue
-
-            # Regular node
             nx, ny = self.w2s(app, node.x, node.y)
             nw, nh, th = NODE_W * app.zoom, NODE_H * app.zoom, TITLE_H * app.zoom
 
@@ -402,6 +384,34 @@ class Renderer:
             # Body
             if nx <= sx <= nx + nw and ny <= sy <= ny + nh:
                 return (node, "title" if sy <= ny + th else "body", None)
+
+        # Containers last (drawn behind)
+        for node in reversed(app.nodes):
+            if node.kind != "container" or node.id in hidden:
+                continue
+            if not get_tool(node.kind):
+                continue
+
+            w = node.params.get("_w", CONTAINER_DEFAULT_W)
+            h = node.params.get("_h", CONTAINER_DEFAULT_H)
+            nx, ny = self.w2s(app, node.x, node.y)
+            nw, nh = w * app.zoom, h * app.zoom
+            th = TITLE_H * app.zoom
+            # Resize handle
+            if not node.params.get("collapsed"):
+                hx, hy = nx + nw - 12, ny + nh - 12
+                if hx <= sx <= nx + nw and hy <= sy <= ny + nh:
+                    return (node, "resize", None)
+            # Title bar
+            if nx <= sx <= nx + nw and ny <= sy <= ny + th:
+                return (node, "title", None)
+            # Body
+            if (
+                not node.params.get("collapsed")
+                and nx <= sx <= nx + nw
+                and ny + th <= sy <= ny + nh
+            ):
+                return (node, "body", None)
 
         return (None, None, None)
 
