@@ -1,19 +1,30 @@
 from __future__ import annotations
+
 import os
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 
-from constants import (
-    DARK_BG, PANEL_BG, CANVAS_BG, TEXT_FG, DIM_FG, ENTRY_BG,
-    CATEGORIES, TOOL_COLORS, CONTAINER_DEFAULT_W, CONTAINER_DEFAULT_H,
-    NODE_W, NODE_H, SELECT_OUTLINE,
-)
-from nodes import get_tool, all_tools
-from engine import Node, Edge, execute_flow
-from renderer import Renderer, _hidden_ids
-from properties import PropertiesPanel
-import project_io
 import export_script
+import project_io
+from constants import (
+    CANVAS_BG,
+    CATEGORIES,
+    CONTAINER_DEFAULT_H,
+    CONTAINER_DEFAULT_W,
+    DARK_BG,
+    DIM_FG,
+    ENTRY_BG,
+    NODE_H,
+    NODE_W,
+    PANEL_BG,
+    SELECT_OUTLINE,
+    TEXT_FG,
+    TOOL_COLORS,
+)
+from engine import Edge, Node, execute_flow
+from nodes import all_tools, get_tool
+from properties import PropertiesPanel
+from renderer import Renderer
 
 
 class FlowApp:
@@ -80,35 +91,32 @@ class FlowApp:
         bg, fg, entry, sel = DARK_BG, TEXT_FG, ENTRY_BG, "#3a3a5a"
         btn, btn_a = "#353548", "#454560"
         style.configure(".", background=bg, foreground=fg, font=("Segoe UI", 9))
-        style.configure("TFrame",      background=bg)
-        style.configure("TLabel",      background=bg, foreground=fg)
-        style.configure("TButton",     background=btn, foreground=fg,
-                        borderwidth=1, relief="flat", padding=(6, 3))
+        style.configure("TFrame", background=bg)
+        style.configure("TLabel", background=bg, foreground=fg)
+        style.configure(
+            "TButton", background=btn, foreground=fg, borderwidth=1, relief="flat", padding=(6, 3)
+        )
         style.map("TButton", background=[("active", btn_a)])
         style.configure("Accent.TButton", background="#3a6fa8", foreground="#ffffff")
         style.map("Accent.TButton", background=[("active", "#4a8fc8")])
-        style.configure("TEntry",      fieldbackground=entry, foreground=fg,
-                        insertcolor=fg)
-        style.configure("TCombobox",   fieldbackground=entry, foreground=fg,
-                        selectbackground=sel)
-        style.map("TCombobox",         fieldbackground=[("readonly", entry)])
+        style.configure("TEntry", fieldbackground=entry, foreground=fg, insertcolor=fg)
+        style.configure("TCombobox", fieldbackground=entry, foreground=fg, selectbackground=sel)
+        style.map("TCombobox", fieldbackground=[("readonly", entry)])
         style.configure("TCheckbutton", background=bg, foreground=fg)
-        style.map("TCheckbutton",       background=[("active", bg)])
-        style.configure("TScrollbar",   background=PANEL_BG, troughcolor=bg,
-                        arrowcolor=fg)
-        style.configure("Treeview",     background=entry, foreground=fg,
-                        fieldbackground=entry, rowheight=22)
-        style.configure("Treeview.Heading", background=PANEL_BG, foreground=fg,
-                        relief="flat")
-        style.map("Treeview",           background=[("selected", sel)])
-        style.configure("TNotebook",    background=bg)
-        style.configure("TNotebook.Tab", background=PANEL_BG, foreground=fg,
-                        padding=(8, 4))
-        style.map("TNotebook.Tab",      background=[("selected", sel)])
+        style.map("TCheckbutton", background=[("active", bg)])
+        style.configure("TScrollbar", background=PANEL_BG, troughcolor=bg, arrowcolor=fg)
+        style.configure(
+            "Treeview", background=entry, foreground=fg, fieldbackground=entry, rowheight=22
+        )
+        style.configure("Treeview.Heading", background=PANEL_BG, foreground=fg, relief="flat")
+        style.map("Treeview", background=[("selected", sel)])
+        style.configure("TNotebook", background=bg)
+        style.configure("TNotebook.Tab", background=PANEL_BG, foreground=fg, padding=(8, 4))
+        style.map("TNotebook.Tab", background=[("selected", sel)])
         style.configure("TPanedwindow", background="#111120")
-        style.configure("TLabelframe",  background=bg, foreground=fg)
+        style.configure("TLabelframe", background=bg, foreground=fg)
         style.configure("TLabelframe.Label", background=bg, foreground=fg)
-        style.configure("TSeparator",   background="#3a3a5a")
+        style.configure("TSeparator", background="#3a3a5a")
         self.root.configure(bg=bg)
 
     # ── UI construction ─────────────────────────────────────────────────────
@@ -132,8 +140,9 @@ class FlowApp:
         sep.pack(fill="x", side="bottom")
 
         # Top area (horizontal: palette | canvas | props) fills remaining space
-        top = tk.PanedWindow(self.root, orient="horizontal",
-                             bg="#111120", sashwidth=5, sashrelief="flat")
+        top = tk.PanedWindow(
+            self.root, orient="horizontal", bg="#111120", sashwidth=5, sashrelief="flat"
+        )
         top.pack(fill="both", expand=True)
         self._top_pane = top
 
@@ -144,8 +153,9 @@ class FlowApp:
 
         # Canvas
         canvas_frame = tk.Frame(top, bg=CANVAS_BG)
-        self.canvas = tk.Canvas(canvas_frame, bg=CANVAS_BG,
-                                highlightthickness=0, cursor="crosshair")
+        self.canvas = tk.Canvas(
+            canvas_frame, bg=CANVAS_BG, highlightthickness=0, cursor="crosshair"
+        )
         self.canvas.pack(fill="both", expand=True)
         top.add(canvas_frame, minsize=400)
 
@@ -190,14 +200,20 @@ class FlowApp:
         btn("1:1", self.reset_zoom)
 
         self._title_var = tk.StringVar(value="PyDataFlow — untitled")
-        tk.Label(tb, textvariable=self._title_var,
-                 bg="#15152a", fg=DIM_FG,
-                 font=("Segoe UI", 9)).pack(side="right", padx=12)
+        tk.Label(
+            tb, textvariable=self._title_var, bg="#15152a", fg=DIM_FG, font=("Segoe UI", 9)
+        ).pack(side="right", padx=12)
 
     def _build_palette(self, parent: tk.Frame) -> None:
-        header = tk.Label(parent, text="NODES", bg=PANEL_BG,
-                          fg=DIM_FG, font=("Segoe UI", 8, "bold"),
-                          anchor="w", padx=8)
+        header = tk.Label(
+            parent,
+            text="NODES",
+            bg=PANEL_BG,
+            fg=DIM_FG,
+            font=("Segoe UI", 8, "bold"),
+            anchor="w",
+            padx=8,
+        )
         header.pack(fill="x")
 
         # Scrollable area
@@ -219,13 +235,21 @@ class FlowApp:
 
         def _wheel(e):
             cv.yview_scroll(int(-1 * (e.delta / 120)), "units")
+
         cv.bind("<MouseWheel>", _wheel)
 
         tool_map = {t.node_type: t for t in all_tools()}
         for cat_name, kinds in CATEGORIES:
-            cat_lbl = tk.Label(inner, text=cat_name.upper(), bg=PANEL_BG,
-                               fg=DIM_FG, font=("Segoe UI", 7, "bold"),
-                               anchor="w", padx=6, pady=4)
+            cat_lbl = tk.Label(
+                inner,
+                text=cat_name.upper(),
+                bg=PANEL_BG,
+                fg=DIM_FG,
+                font=("Segoe UI", 7, "bold"),
+                anchor="w",
+                padx=6,
+                pady=4,
+            )
             cat_lbl.pack(fill="x", pady=(8, 0))
             for kind in kinds:
                 tool = tool_map.get(kind)
@@ -237,16 +261,26 @@ class FlowApp:
                 row.pack(fill="x", padx=4, pady=1)
                 indicator = tk.Frame(row, bg=color, width=4)
                 indicator.pack(side="left", fill="y")
-                lbl = tk.Label(row, text=tool.display_name, bg=PANEL_BG,
-                               fg=TEXT_FG, font=("Segoe UI", 9), anchor="w",
-                               padx=6, pady=4, cursor="fleur")
+                lbl = tk.Label(
+                    row,
+                    text=tool.display_name,
+                    bg=PANEL_BG,
+                    fg=TEXT_FG,
+                    font=("Segoe UI", 9),
+                    anchor="w",
+                    padx=6,
+                    pady=4,
+                    cursor="fleur",
+                )
                 lbl.pack(side="left", fill="x", expand=True)
 
                 # Drag-to-canvas: press starts ghost, release on canvas adds node
                 for widget in (row, lbl):
-                    widget.bind("<ButtonPress-1>",
-                                lambda e, k=kind, c=color: self._palette_drag_start(e, k, c))
-                    widget.bind("<B1-Motion>",   self._palette_drag_motion)
+                    widget.bind(
+                        "<ButtonPress-1>",
+                        lambda e, k=kind, c=color: self._palette_drag_start(e, k, c),
+                    )
+                    widget.bind("<B1-Motion>", self._palette_drag_motion)
                     widget.bind("<ButtonRelease-1>", self._palette_drag_release)
 
                 row.bind("<Enter>", lambda e, r=row: r.configure(bg="#333350"))
@@ -257,9 +291,15 @@ class FlowApp:
     def _make_log_tab(self, nb: ttk.Notebook) -> tk.Text:
         frame = ttk.Frame(nb)
         nb.add(frame, text="  Log  ")
-        text = tk.Text(frame, bg="#0d0d1a", fg=TEXT_FG,
-                       font=("Courier New", 8), state="disabled",
-                       relief="flat", height=6)
+        text = tk.Text(
+            frame,
+            bg="#0d0d1a",
+            fg=TEXT_FG,
+            font=("Courier New", 8),
+            state="disabled",
+            relief="flat",
+            height=6,
+        )
         sb = ttk.Scrollbar(frame, orient="vertical", command=text.yview)
         text.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
@@ -275,16 +315,16 @@ class FlowApp:
 
     def _bind_canvas(self) -> None:
         c = self.canvas
-        c.bind("<Button-1>",        self._on_click)
-        c.bind("<B1-Motion>",       self._on_drag)
+        c.bind("<Button-1>", self._on_click)
+        c.bind("<B1-Motion>", self._on_drag)
         c.bind("<ButtonRelease-1>", self._on_release)
-        c.bind("<Button-2>",        self._start_pan)
-        c.bind("<B2-Motion>",       self._do_pan)
-        c.bind("<Button-3>",        self._on_right_click)
+        c.bind("<Button-2>", self._start_pan)
+        c.bind("<B2-Motion>", self._do_pan)
+        c.bind("<Button-3>", self._on_right_click)
         c.bind("<Double-Button-1>", self._on_double_click)
-        c.bind("<MouseWheel>",      self._on_scroll)   # Windows / macOS
-        c.bind("<Button-4>",        lambda e: self._scroll_delta(e,  120))  # Linux up
-        c.bind("<Button-5>",        lambda e: self._scroll_delta(e, -120))  # Linux down
+        c.bind("<MouseWheel>", self._on_scroll)  # Windows / macOS
+        c.bind("<Button-4>", lambda e: self._scroll_delta(e, 120))  # Linux up
+        c.bind("<Button-5>", lambda e: self._scroll_delta(e, -120))  # Linux down
 
     # ── Canvas events ────────────────────────────────────────────────────────
 
@@ -294,24 +334,24 @@ class FlowApp:
         if hit == "port_out":
             self.wire_start_node = node
             self.wire_start_port = port
-            self.wire_start_dir  = "out"
-            self.wire_pos        = (event.x, event.y)
+            self.wire_start_dir = "out"
+            self.wire_pos = (event.x, event.y)
         elif hit == "port_in":
             self.wire_start_node = node
             self.wire_start_port = port
-            self.wire_start_dir  = "in"
-            self.wire_pos        = (event.x, event.y)
+            self.wire_start_dir = "in"
+            self.wire_pos = (event.x, event.y)
         elif hit == "resize" and node:
             self.resizing = node
             self.resize_start_mouse = (event.x, event.y)
-            self.resize_start_size  = (
+            self.resize_start_size = (
                 node.params.get("_w", CONTAINER_DEFAULT_W),
                 node.params.get("_h", CONTAINER_DEFAULT_H),
             )
         elif hit in ("title", "body") and node:
             self._select_node(node)
             wx, wy = self._s2w(event.x, event.y)
-            self.drag_node     = node
+            self.drag_node = node
             self.drag_offset_x = wx - node.x
             self.drag_offset_y = wy - node.y
             if node.kind == "container" and not node.params.get("collapsed"):
@@ -324,7 +364,7 @@ class FlowApp:
         else:
             self._deselect()
             self.panning = True
-            self.pan_start     = (event.x, event.y)
+            self.pan_start = (event.x, event.y)
             self.pan_start_off = (self.pan_x, self.pan_y)
         self.redraw()
 
@@ -332,8 +372,11 @@ class FlowApp:
         if self.wire_start_node:
             self.wire_pos = (event.x, event.y)
             n, hit, port = self.renderer.hit_test(self, event.x, event.y)
-            self.hover_port = (n.id, port, "in" if hit == "port_in" else "out") \
-                if n and hit in ("port_in", "port_out") else None
+            self.hover_port = (
+                (n.id, port, "in" if hit == "port_in" else "out")
+                if n and hit in ("port_in", "port_out")
+                else None
+            )
             self.redraw()
         elif self.drag_node:
             wx, wy = self._s2w(event.x, event.y)
@@ -358,8 +401,11 @@ class FlowApp:
             self.redraw()
         else:
             n, hit, port = self.renderer.hit_test(self, event.x, event.y)
-            new_hp = (n.id, port, "in" if hit == "port_in" else "out") \
-                if n and hit in ("port_in", "port_out") else None
+            new_hp = (
+                (n.id, port, "in" if hit == "port_in" else "out")
+                if n and hit in ("port_in", "port_out")
+                else None
+            )
             if new_hp != self.hover_port:
                 self.hover_port = new_hp
                 self.redraw()
@@ -368,7 +414,11 @@ class FlowApp:
         if self.wire_start_node:
             n, hit, port = self.renderer.hit_test(self, event.x, event.y)
             if n and hit in ("port_in", "port_out"):
-                src_n, src_p, src_d = self.wire_start_node, self.wire_start_port, self.wire_start_dir
+                src_n, src_p, src_d = (
+                    self.wire_start_node,
+                    self.wire_start_port,
+                    self.wire_start_dir,
+                )
                 dst_d = "in" if hit == "port_in" else "out"
                 if src_d == "out" and dst_d == "in":
                     self._add_edge(src_n, src_p, n, port)
@@ -380,17 +430,17 @@ class FlowApp:
     def _reset_interaction(self) -> None:
         self.wire_start_node = None
         self.wire_start_port = None
-        self.wire_start_dir  = None
-        self.wire_pos        = None
-        self.drag_node       = None
-        self.drag_children   = []
-        self.panning         = False
-        self.resizing        = None
-        self.hover_port      = None
+        self.wire_start_dir = None
+        self.wire_pos = None
+        self.drag_node = None
+        self.drag_children = []
+        self.panning = False
+        self.resizing = None
+        self.hover_port = None
 
     def _start_pan(self, event) -> None:
-        self.panning       = True
-        self.pan_start     = (event.x, event.y)
+        self.panning = True
+        self.pan_start = (event.x, event.y)
         self.pan_start_off = (self.pan_x, self.pan_y)
 
     def _do_pan(self, event) -> None:
@@ -400,29 +450,36 @@ class FlowApp:
 
     def _on_right_click(self, event) -> None:
         node, hit, port = self.renderer.hit_test(self, event.x, event.y)
-        menu = tk.Menu(self.root, tearoff=0, bg=PANEL_BG, fg=TEXT_FG,
-                       activebackground="#3a3a5a", activeforeground=TEXT_FG)
+        menu = tk.Menu(
+            self.root,
+            tearoff=0,
+            bg=PANEL_BG,
+            fg=TEXT_FG,
+            activebackground="#3a3a5a",
+            activeforeground=TEXT_FG,
+        )
         if node:
             tool = get_tool(node.kind)
-            menu.add_command(label=f"{tool.display_name if tool else node.kind}  [{node.id}]",
-                             state="disabled")
+            menu.add_command(
+                label=f"{tool.display_name if tool else node.kind}  [{node.id}]", state="disabled"
+            )
             menu.add_separator()
-            menu.add_command(label="Delete",
-                             command=lambda: self.delete_node(node))
+            menu.add_command(label="Delete", command=lambda: self.delete_node(node))
             label = "Enable" if node.disabled else "Disable"
             menu.add_command(label=label, command=lambda: self.toggle_disabled(node))
             if node.result:
-                menu.add_command(label="View data…",
-                                 command=lambda: self.show_table_viewer(node))
+                menu.add_command(label="View data…", command=lambda: self.show_table_viewer(node))
         else:
             menu.add_command(label="Fit view", command=self.fit_view)
             menu.add_command(label="Reset zoom", command=self.reset_zoom)
             wx, wy = self._s2w(event.x, event.y)
             menu.add_separator()
-            menu.add_command(label="Add Comment here",
-                             command=lambda: self.add_node("comment", wx, wy))
-            menu.add_command(label="Add Container here",
-                             command=lambda: self.add_node("container", wx, wy))
+            menu.add_command(
+                label="Add Comment here", command=lambda: self.add_node("comment", wx, wy)
+            )
+            menu.add_command(
+                label="Add Container here", command=lambda: self.add_node("container", wx, wy)
+            )
         menu.post(event.x_root, event.y_root)
 
     def _on_double_click(self, event) -> None:
@@ -444,7 +501,7 @@ class FlowApp:
         wy = (event.y - self.pan_y) / self.zoom
         self.pan_x = event.x - wx * new_zoom
         self.pan_y = event.y - wy * new_zoom
-        self.zoom  = new_zoom
+        self.zoom = new_zoom
         self.redraw()
 
     # ── Coordinate helpers ────────────────────────────────────────────────────
@@ -455,7 +512,7 @@ class FlowApp:
     # ── Graph operations ─────────────────────────────────────────────────────
 
     def add_node(self, kind: str, x: float, y: float) -> Node:
-        tool = get_tool(kind)
+        get_tool(kind)
         node = Node(kind, x, y)
         if kind == "container":
             node.params.setdefault("_w", CONTAINER_DEFAULT_W)
@@ -470,8 +527,7 @@ class FlowApp:
         return node
 
     def delete_node(self, node: Node) -> None:
-        self.edges = [e for e in self.edges
-                      if e.src_node != node.id and e.dst_node != node.id]
+        self.edges = [e for e in self.edges if e.src_node != node.id and e.dst_node != node.id]
         self.nodes.remove(node)
         self.nodes_by_id.pop(node.id, None)
         self.selected_ids.discard(node.id)
@@ -487,8 +543,9 @@ class FlowApp:
 
     def _add_edge(self, src: Node, src_port: str, dst: Node, dst_port: str) -> None:
         # Remove any existing edge to this input port
-        self.edges = [e for e in self.edges
-                      if not (e.dst_node == dst.id and e.dst_port == dst_port)]
+        self.edges = [
+            e for e in self.edges if not (e.dst_node == dst.id and e.dst_port == dst_port)
+        ]
         self.edges.append(Edge(src.id, src_port, dst.id, dst_port))
         self.mark_dirty()
 
@@ -509,8 +566,10 @@ class FlowApp:
         w = container.params.get("_w", CONTAINER_DEFAULT_W)
         h = container.params.get("_h", CONTAINER_DEFAULT_H)
         return [
-            n for n in self.nodes
-            if n.id != container.id and n.kind != "container"
+            n
+            for n in self.nodes
+            if n.id != container.id
+            and n.kind != "container"
             and container.x <= n.x <= container.x + w
             and container.y <= n.y <= container.y + h
         ]
@@ -546,27 +605,31 @@ class FlowApp:
             ghost.attributes("-topmost", True)
         except Exception:
             pass
-        tk.Label(ghost, text=f"  {tool.display_name}  ",
-                 bg=color, fg="#ffffff",
-                 font=("Segoe UI", 9, "bold"),
-                 padx=8, pady=6, relief="flat").pack()
+        tk.Label(
+            ghost,
+            text=f"  {tool.display_name}  ",
+            bg=color,
+            fg="#ffffff",
+            font=("Segoe UI", 9, "bold"),
+            padx=8,
+            pady=6,
+            relief="flat",
+        ).pack()
         ghost.geometry(f"+{event.x_root + 12}+{event.y_root + 12}")
         self.palette_drag_ghost = ghost
 
     def _palette_drag_motion(self, event) -> None:
         if self.palette_drag_ghost:
-            self.palette_drag_ghost.geometry(
-                f"+{event.x_root + 12}+{event.y_root + 12}")
+            self.palette_drag_ghost.geometry(f"+{event.x_root + 12}+{event.y_root + 12}")
             # Highlight canvas edge when hovering over it
             cx = self.canvas.winfo_rootx()
             cy = self.canvas.winfo_rooty()
             cw = self.canvas.winfo_width()
             ch = self.canvas.winfo_height()
-            over = (cx <= event.x_root <= cx + cw and
-                    cy <= event.y_root <= cy + ch)
+            over = cx <= event.x_root <= cx + cw and cy <= event.y_root <= cy + ch
             self.canvas.configure(
-                highlightthickness=2 if over else 0,
-                highlightbackground=SELECT_OUTLINE)
+                highlightthickness=2 if over else 0, highlightbackground=SELECT_OUTLINE
+            )
 
     def _palette_drag_release(self, event) -> None:
         self.canvas.configure(highlightthickness=0)
@@ -581,8 +644,7 @@ class FlowApp:
         cy = self.canvas.winfo_rooty()
         cw = self.canvas.winfo_width()
         ch = self.canvas.winfo_height()
-        if (cx <= event.x_root <= cx + cw and
-                cy <= event.y_root <= cy + ch):
+        if cx <= event.x_root <= cx + cw and cy <= event.y_root <= cy + ch:
             sx = event.x_root - cx
             sy = event.y_root - cy
             wx, wy = self._s2w(sx, sy)
@@ -623,25 +685,27 @@ class FlowApp:
         for w in self._preview_frame.winfo_children():
             w.destroy()
         if not node.result:
-            ttk.Label(self._preview_frame,
-                      text="No data — run the flow first.",
-                      foreground=DIM_FG).pack(expand=True)
+            ttk.Label(
+                self._preview_frame, text="No data — run the flow first.", foreground=DIM_FG
+            ).pack(expand=True)
             return
 
         # Port buttons if multiple outputs
-        ports = [(p, df) for p, df in node.result.items()
-                 if hasattr(df, "columns")]
+        ports = [(p, df) for p, df in node.result.items() if hasattr(df, "columns")]
         if not ports:
-            ttk.Label(self._preview_frame, text="No tabular output.",
-                      foreground=DIM_FG).pack(expand=True)
+            ttk.Label(self._preview_frame, text="No tabular output.", foreground=DIM_FG).pack(
+                expand=True
+            )
             return
 
         if len(ports) > 1:
             btn_bar = ttk.Frame(self._preview_frame)
             btn_bar.pack(fill="x")
             for pname, pdf in ports:
+
                 def show_port(df=pdf, lbl=pname):
                     self._render_preview_df(df, lbl)
+
                 ttk.Button(btn_bar, text=pname, command=show_port).pack(side="left", padx=2, pady=2)
 
         self._render_preview_df(ports[0][1], ports[0][0])
@@ -659,7 +723,7 @@ class FlowApp:
         frame.pack(fill="both", expand=True)
 
         tree = ttk.Treeview(frame, columns=cols, show="headings", height=5)
-        vs = ttk.Scrollbar(frame, orient="vertical",   command=tree.yview)
+        vs = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
         hs = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
         tree.configure(yscrollcommand=vs.set, xscrollcommand=hs.set)
 
@@ -668,17 +732,19 @@ class FlowApp:
             tree.column(col, width=max(60, min(180, len(str(col)) * 9)), minwidth=40)
 
         hs.pack(side="bottom", fill="x")
-        vs.pack(side="right",  fill="y")
+        vs.pack(side="right", fill="y")
         tree.pack(fill="both", expand=True)
 
         limit = min(200, len(df))
         for _, row in df.head(limit).iterrows():
             tree.insert("", "end", values=[str(v) if v is not None else "" for v in row])
 
-        ttk.Label(self._preview_frame,
-                  text=f"{label}  {len(df):,} rows × {len(df.columns)} cols"
-                       f"  (showing {limit})",
-                  foreground=DIM_FG, font=("Segoe UI", 8)).pack(side="bottom")
+        ttk.Label(
+            self._preview_frame,
+            text=f"{label}  {len(df):,} rows × {len(df.columns)} cols  (showing {limit})",
+            foreground=DIM_FG,
+            font=("Segoe UI", 8),
+        ).pack(side="bottom")
 
     def show_table_viewer(self, node: Node) -> None:
         if not node.result:
@@ -738,8 +804,7 @@ class FlowApp:
             self.save_project()
 
     def open_project(self) -> None:
-        if self._dirty and not messagebox.askyesno(
-                "Unsaved changes", "Discard unsaved changes?"):
+        if self._dirty and not messagebox.askyesno("Unsaved changes", "Discard unsaved changes?"):
             return
         path = filedialog.askopenfilename(
             filetypes=[("PyDataFlow project", "*.json"), ("All", "*.*")],
@@ -795,7 +860,7 @@ class FlowApp:
         ys = [n.y for n in self.nodes]
         x_min, x_max = min(xs), max(xs) + NODE_W + 100
         y_min, y_max = min(ys), max(ys) + NODE_H + 60
-        cw = self.canvas.winfo_width()  or 800
+        cw = self.canvas.winfo_width() or 800
         ch = self.canvas.winfo_height() or 500
         available_w = cw - 2 * margin
         available_h = ch - 2 * margin
@@ -821,6 +886,7 @@ class FlowApp:
 
 # ── Module-level table viewer (also used by main.py) ─────────────────────────
 
+
 def _open_table_window(root: tk.Tk | tk.Toplevel, title: str, df) -> None:
     win = tk.Toplevel(root)
     win.title(title)
@@ -832,7 +898,7 @@ def _open_table_window(root: tk.Tk | tk.Toplevel, title: str, df) -> None:
     frame.pack(fill="both", expand=True)
 
     tree = ttk.Treeview(frame, columns=cols, show="headings")
-    vs = ttk.Scrollbar(frame, orient="vertical",   command=tree.yview)
+    vs = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
     hs = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
     tree.configure(yscrollcommand=vs.set, xscrollcommand=hs.set)
 
@@ -841,12 +907,16 @@ def _open_table_window(root: tk.Tk | tk.Toplevel, title: str, df) -> None:
         tree.column(col, width=max(60, min(180, len(str(col)) * 9)), minwidth=40)
 
     hs.pack(side="bottom", fill="x")
-    vs.pack(side="right",  fill="y")
+    vs.pack(side="right", fill="y")
     tree.pack(fill="both", expand=True)
 
     limit = min(500, len(df))
     for _, row in df.head(limit).iterrows():
         tree.insert("", "end", values=[str(v) if v is not None else "" for v in row])
 
-    ttk.Label(win, text=f"{len(df):,} rows × {len(df.columns)} cols  (showing {limit})",
-              background=PANEL_BG, foreground=DIM_FG).pack(pady=4)
+    ttk.Label(
+        win,
+        text=f"{len(df):,} rows × {len(df.columns)} cols  (showing {limit})",
+        background=PANEL_BG,
+        foreground=DIM_FG,
+    ).pack(pady=4)

@@ -1,11 +1,14 @@
 """Input / Output tool nodes: Import CSV, Import Excel, Show Table, Export CSV, Export Excel."""
+
 from __future__ import annotations
+
 import os
-import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk
+
 import pandas as pd
-from nodes.base import BaseTool
+
 from constants import DELIM_MAP
+from nodes.base import BaseTool
 
 
 class ImportCSV(BaseTool):
@@ -16,10 +19,24 @@ class ImportCSV(BaseTool):
     outs = ["data"]
 
     def build_config(self, parent, params, on_change, columns=None):
-        self.add_file_picker(parent, "File", "file_path", params, on_change, 0,
-                             filetypes=[("CSV / Text", "*.csv *.txt *.tsv"), ("All", "*.*")])
-        self.add_combobox(parent, "Delimiter", "delimiter", ["comma", "tab", "pipe", "semicolon", "custom"],
-                          params, on_change, 1)
+        self.add_file_picker(
+            parent,
+            "File",
+            "file_path",
+            params,
+            on_change,
+            0,
+            filetypes=[("CSV / Text", "*.csv *.txt *.tsv"), ("All", "*.*")],
+        )
+        self.add_combobox(
+            parent,
+            "Delimiter",
+            "delimiter",
+            ["comma", "tab", "pipe", "semicolon", "custom"],
+            params,
+            on_change,
+            1,
+        )
         self.add_entry(parent, "Custom delim", "custom_delim", params, on_change, 2, width=4)
         self.add_checkbox(parent, "Skip blank lines", "skip_blank", params, on_change, 3)
 
@@ -55,8 +72,15 @@ class ImportExcel(BaseTool):
     outs = ["data"]
 
     def build_config(self, parent, params, on_change, columns=None):
-        self.add_file_picker(parent, "File", "file_path", params, on_change, 0,
-                             filetypes=[("Excel", "*.xlsx *.xls *.xlsm"), ("All", "*.*")])
+        self.add_file_picker(
+            parent,
+            "File",
+            "file_path",
+            params,
+            on_change,
+            0,
+            filetypes=[("Excel", "*.xlsx *.xls *.xlsm"), ("All", "*.*")],
+        )
         self.add_entry(parent, "Sheet", "sheet_name", params, on_change, 1)
 
     def execute(self, params, inputs, log):
@@ -72,7 +96,9 @@ class ImportExcel(BaseTool):
         path = params.get("file_path", "")
         sheet = params.get("sheet_name") or 0
         sheet_arg = f'"{sheet}"' if isinstance(sheet, str) and sheet else str(sheet)
-        return [f'{output_var} = pd.read_excel(r"{path}", sheet_name={sheet_arg}, engine="openpyxl")']
+        return [
+            f'{output_var} = pd.read_excel(r"{path}", sheet_name={sheet_arg}, engine="openpyxl")'
+        ]
 
     def subtitle(self, params):
         p = params.get("file_path", "")
@@ -88,7 +114,8 @@ class ShowTable(BaseTool):
 
     def build_config(self, parent, params, on_change, columns=None):
         ttk.Label(parent, text="Opens a pop-out data viewer\nwhen the flow is run.").grid(
-            row=0, column=0, columnspan=2, sticky="w", padx=4, pady=4)
+            row=0, column=0, columnspan=2, sticky="w", padx=4, pady=4
+        )
         self.add_entry(parent, "Max rows", "max_rows", params, on_change, 1, width=8)
         params.setdefault("max_rows", "500")
 
@@ -117,9 +144,17 @@ class ExportCSV(BaseTool):
     outs = []
 
     def build_config(self, parent, params, on_change, columns=None):
-        self.add_file_picker(parent, "Output file", "file_path", params, on_change, 0,
-                             filetypes=[("CSV", "*.csv"), ("All", "*.*")],
-                             save=True, default_ext=".csv")
+        self.add_file_picker(
+            parent,
+            "Output file",
+            "file_path",
+            params,
+            on_change,
+            0,
+            filetypes=[("CSV", "*.csv"), ("All", "*.*")],
+            save=True,
+            default_ext=".csv",
+        )
         self.add_checkbox(parent, "Include index", "include_index", params, on_change, 1)
 
     def execute(self, params, inputs, log):
@@ -153,9 +188,17 @@ class ExportExcel(BaseTool):
     outs = []
 
     def build_config(self, parent, params, on_change, columns=None):
-        self.add_file_picker(parent, "Output file", "file_path", params, on_change, 0,
-                             filetypes=[("Excel", "*.xlsx"), ("All", "*.*")],
-                             save=True, default_ext=".xlsx")
+        self.add_file_picker(
+            parent,
+            "Output file",
+            "file_path",
+            params,
+            on_change,
+            0,
+            filetypes=[("Excel", "*.xlsx"), ("All", "*.*")],
+            save=True,
+            default_ext=".xlsx",
+        )
         self.add_entry(parent, "Sheet name", "sheet_name", params, on_change, 1)
         params.setdefault("sheet_name", "Sheet1")
 

@@ -9,17 +9,19 @@ For CSV/Excel import nodes it reads file headers directly.
 For other nodes it uses cached node.result if the pipeline has been run,
 or propagates column lists through pass-through tools (SelectColumns, etc.).
 """
+
 from __future__ import annotations
+
 import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from engine import Node, Edge
+    pass
 
 
-def infer_columns(target_node_id: str, target_port: str,
-                  nodes: list, edges: list,
-                  port: str = "data") -> list[str]:
+def infer_columns(
+    target_node_id: str, target_port: str, nodes: list, edges: list, port: str = "data"
+) -> list[str]:
     """
     Trace upstream from (target_node_id, target_port) and return
     the column names available at that input.
@@ -53,7 +55,9 @@ def _cols_from_node(node, port: str, nodes: list, edges: list) -> list[str]:
         if path and os.path.exists(path):
             try:
                 import pandas as pd
+
                 from constants import DELIM_MAP
+
                 dm = node.params.get("delimiter", "comma")
                 sep = DELIM_MAP.get(dm, node.params.get("custom_delim", ",") or ",")
                 df = pd.read_csv(path, sep=sep, nrows=0)
@@ -67,6 +71,7 @@ def _cols_from_node(node, port: str, nodes: list, edges: list) -> list[str]:
         if path and os.path.exists(path):
             try:
                 import pandas as pd
+
                 sheet = node.params.get("sheet_name") or 0
                 df = pd.read_excel(path, sheet_name=sheet, nrows=0, engine="openpyxl")
                 return list(df.columns)

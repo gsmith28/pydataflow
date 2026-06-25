@@ -1,8 +1,11 @@
 """Transform / Summarize tool nodes: Summarize, GroupBy, Pivot, Unpivot."""
+
 from __future__ import annotations
-import tkinter as tk
+
 from tkinter import ttk
+
 import pandas as pd
+
 from nodes.base import BaseTool
 
 
@@ -14,11 +17,12 @@ class Summarize(BaseTool):
     outs = ["data"]
 
     def build_config(self, parent, params, on_change, columns=None):
-        self.add_combobox(parent, "Scope", "scope",
-                          ["all", "numeric", "specific"],
-                          params, on_change, 0)
-        self.add_column_multiselect(parent, "Specific cols", "columns",
-                                    params, on_change, 1, columns or [])
+        self.add_combobox(
+            parent, "Scope", "scope", ["all", "numeric", "specific"], params, on_change, 0
+        )
+        self.add_column_multiselect(
+            parent, "Specific cols", "columns", params, on_change, 1, columns or []
+        )
         self.add_checkbox(parent, "Include percentiles", "percentiles", params, on_change, 2)
         self.add_checkbox(parent, "Transpose result", "transpose", params, on_change, 3)
 
@@ -66,19 +70,30 @@ class GroupBy(BaseTool):
     outs = ["data"]
 
     def build_config(self, parent, params, on_change, columns=None):
-        self.add_column_multiselect(parent, "Group columns", "group_cols",
-                                    params, on_change, 0, columns or [])
+        self.add_column_multiselect(
+            parent, "Group columns", "group_cols", params, on_change, 0, columns or []
+        )
         agg_fields = [
             {"key": "column", "type": "combobox", "values": columns or [], "width": 12},
-            {"key": "func", "type": "combobox",
-             "values": ["sum", "mean", "count", "min", "max", "std", "median", "first", "last"],
-             "width": 8},
+            {
+                "key": "func",
+                "type": "combobox",
+                "values": ["sum", "mean", "count", "min", "max", "std", "median", "first", "last"],
+                "width": 8,
+            },
             {"key": "alias", "type": "entry", "width": 10},
         ]
         ttk.Label(parent, text="Aggregations (col / func / alias):").grid(
-            row=1, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 0))
-        self.add_dynamic_rows(parent, "aggs", params, on_change, agg_fields,
-                              default_row={"column": "", "func": "sum", "alias": ""})
+            row=1, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 0)
+        )
+        self.add_dynamic_rows(
+            parent,
+            "aggs",
+            params,
+            on_change,
+            agg_fields,
+            default_row={"column": "", "func": "sum", "alias": ""},
+        )
 
     def execute(self, params, inputs, log):
         df = inputs.get("data")
@@ -108,8 +123,7 @@ class GroupBy(BaseTool):
             else:
                 result = df.groupby(group_cols).agg(agg_dict).reset_index()
                 result.columns = [
-                    "_".join(c).rstrip("_") if isinstance(c, tuple) else c
-                    for c in result.columns
+                    "_".join(c).rstrip("_") if isinstance(c, tuple) else c for c in result.columns
                 ]
         log(f"Group By: {len(result)} groups")
         return {"data": result}
@@ -150,12 +164,24 @@ class Pivot(BaseTool):
     outs = ["data"]
 
     def build_config(self, parent, params, on_change, columns=None):
-        self.add_column_dropdown(parent, "Index field", "index_col", params, on_change, 0, columns or [])
-        self.add_column_dropdown(parent, "Columns field", "columns_col", params, on_change, 1, columns or [])
-        self.add_column_dropdown(parent, "Values field", "values_col", params, on_change, 2, columns or [])
-        self.add_combobox(parent, "Aggregation", "aggfunc",
-                          ["mean", "sum", "count", "min", "max", "first"],
-                          params, on_change, 3)
+        self.add_column_dropdown(
+            parent, "Index field", "index_col", params, on_change, 0, columns or []
+        )
+        self.add_column_dropdown(
+            parent, "Columns field", "columns_col", params, on_change, 1, columns or []
+        )
+        self.add_column_dropdown(
+            parent, "Values field", "values_col", params, on_change, 2, columns or []
+        )
+        self.add_combobox(
+            parent,
+            "Aggregation",
+            "aggfunc",
+            ["mean", "sum", "count", "min", "max", "first"],
+            params,
+            on_change,
+            3,
+        )
 
     def execute(self, params, inputs, log):
         df = inputs.get("data")
@@ -167,8 +193,9 @@ class Pivot(BaseTool):
         aggfunc = params.get("aggfunc", "mean")
         if not all([idx, cols, vals]):
             raise ValueError("Index, columns, and values fields are required")
-        result = pd.pivot_table(df, index=idx, columns=cols, values=vals,
-                                aggfunc=aggfunc).reset_index()
+        result = pd.pivot_table(
+            df, index=idx, columns=cols, values=vals, aggfunc=aggfunc
+        ).reset_index()
         result.columns = [str(c) for c in result.columns]
         log(f"Pivot: {len(result)} rows × {len(result.columns)} cols")
         return {"data": result}
@@ -198,10 +225,12 @@ class Unpivot(BaseTool):
     outs = ["data"]
 
     def build_config(self, parent, params, on_change, columns=None):
-        self.add_column_multiselect(parent, "ID columns", "id_cols",
-                                    params, on_change, 0, columns or [])
-        self.add_column_multiselect(parent, "Value columns", "value_cols",
-                                    params, on_change, 1, columns or [])
+        self.add_column_multiselect(
+            parent, "ID columns", "id_cols", params, on_change, 0, columns or []
+        )
+        self.add_column_multiselect(
+            parent, "Value columns", "value_cols", params, on_change, 1, columns or []
+        )
         self.add_entry(parent, "Variable col name", "var_name", params, on_change, 2)
         self.add_entry(parent, "Value col name", "value_name", params, on_change, 3)
         params.setdefault("var_name", "variable")
@@ -219,8 +248,13 @@ class Unpivot(BaseTool):
             val_cols = [c.strip() for c in val_cols.split(",") if c.strip()]
         var_name = params.get("var_name") or "variable"
         value_name = params.get("value_name") or "value"
-        result = pd.melt(df, id_vars=id_cols or None, value_vars=val_cols or None,
-                         var_name=var_name, value_name=value_name)
+        result = pd.melt(
+            df,
+            id_vars=id_cols or None,
+            value_vars=val_cols or None,
+            var_name=var_name,
+            value_name=value_name,
+        )
         log(f"Unpivot: {len(result)} rows")
         return {"data": result}
 
@@ -231,7 +265,7 @@ class Unpivot(BaseTool):
         var_name = params.get("var_name") or "variable"
         value_name = params.get("value_name") or "value"
         return [
-            f'{output_var} = pd.melt({iv}, id_vars={id_cols!r}, value_vars={val_cols!r}, '
+            f"{output_var} = pd.melt({iv}, id_vars={id_cols!r}, value_vars={val_cols!r}, "
             f'var_name="{var_name}", value_name="{value_name}")'
         ]
 

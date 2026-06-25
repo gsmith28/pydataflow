@@ -4,32 +4,36 @@ Preparation tool nodes (9 tools).
 SelectColumns, FilterRows, Sort, HeadTail, RenameColumns,
 EditColumns, AddColumns, Cleansing, RecordID.
 """
+
 from __future__ import annotations
+
 import tkinter as tk
 from tkinter import ttk
+
 import pandas as pd
+
 from nodes.base import BaseTool
 
 # ── Filter operator table ────────────────────────────────────────────────────
 _FILTER_OPS = [
-    ("equals",       "= equals"),
-    ("not_equals",   "≠ not equals"),
+    ("equals", "= equals"),
+    ("not_equals", "≠ not equals"),
     ("greater_than", "> greater than"),
-    ("greater_eq",   "≥ greater or equal"),
-    ("less_than",    "< less than"),
-    ("less_eq",      "≤ less or equal"),
-    ("contains",     "contains"),
-    ("starts_with",  "starts with"),
-    ("ends_with",    "ends with"),
-    ("is_null",      "is null"),
-    ("not_null",     "is not null"),
-    ("in_list",      "in list  (a,b,c)"),
-    ("between",      "between  lo,hi"),
+    ("greater_eq", "≥ greater or equal"),
+    ("less_than", "< less than"),
+    ("less_eq", "≤ less or equal"),
+    ("contains", "contains"),
+    ("starts_with", "starts with"),
+    ("ends_with", "ends with"),
+    ("is_null", "is null"),
+    ("not_null", "is not null"),
+    ("in_list", "in list  (a,b,c)"),
+    ("between", "between  lo,hi"),
 ]
 _OP_DISP = [d for _, d in _FILTER_OPS]
-_OP_KEY  = [k for k, _ in _FILTER_OPS]
-_D2K     = {d: k for k, d in _FILTER_OPS}
-_K2D     = {k: d for k, d in _FILTER_OPS}
+_OP_KEY = [k for k, _ in _FILTER_OPS]
+_D2K = {d: k for k, d in _FILTER_OPS}
+_K2D = {k: d for k, d in _FILTER_OPS}
 
 _ADD_COL_HELP = (
     "Formula examples (reference columns by name):\n"
@@ -54,8 +58,7 @@ class SelectColumns(BaseTool):
 
     def build_config(self, parent, params, on_change, columns=None):
         cols = columns if isinstance(columns, list) else []
-        self.add_column_multiselect(parent, "Columns", "columns",
-                                    params, on_change, 0, cols)
+        self.add_column_multiselect(parent, "Columns", "columns", params, on_change, 0, cols)
 
     def execute(self, params, inputs, log):
         df = inputs.get("data")
@@ -99,12 +102,12 @@ class FilterRows(BaseTool):
         params.setdefault("logic", "AND")
 
         # ── Logic row ────────────────────────────────────────────────────
-        self.add_combobox(parent, "Logic", "logic", ["AND", "OR"],
-                          params, on_change, 0)
+        self.add_combobox(parent, "Logic", "logic", ["AND", "OR"], params, on_change, 0)
 
         # ── Conditions ───────────────────────────────────────────────────
         ttk.Label(parent, text="Conditions:").grid(
-            row=1, column=0, columnspan=2, sticky="w", padx=4, pady=(6, 2))
+            row=1, column=0, columnspan=2, sticky="w", padx=4, pady=(6, 2)
+        )
 
         container = ttk.Frame(parent)
         container.grid(row=2, column=0, columnspan=2, sticky="ew", padx=4)
@@ -122,38 +125,56 @@ class FilterRows(BaseTool):
 
                 # Column dropdown
                 col_var = tk.StringVar(value=cond.get("column", ""))
+
                 def _col_cb(*_, c=cond, v=col_var):
-                    c["column"] = v.get(); on_change()
+                    c["column"] = v.get()
+                    on_change()
+
                 col_var.trace_add("write", _col_cb)
-                ttk.Combobox(rf, textvariable=col_var, values=cols,
-                             width=13).pack(side="left", padx=(0, 2))
+                ttk.Combobox(rf, textvariable=col_var, values=cols, width=13).pack(
+                    side="left", padx=(0, 2)
+                )
 
                 # Operator dropdown (display → key mapping)
-                cur_op  = cond.get("operator", "equals")
-                op_var  = tk.StringVar(value=_K2D.get(cur_op, _OP_DISP[0]))
+                cur_op = cond.get("operator", "equals")
+                op_var = tk.StringVar(value=_K2D.get(cur_op, _OP_DISP[0]))
+
                 def _op_cb(*_, c=cond, v=op_var):
-                    c["operator"] = _D2K.get(v.get(), "equals"); on_change()
+                    c["operator"] = _D2K.get(v.get(), "equals")
+                    on_change()
+
                 op_var.trace_add("write", _op_cb)
-                ttk.Combobox(rf, textvariable=op_var, values=_OP_DISP,
-                             state="readonly", width=16).pack(side="left", padx=(0, 2))
+                ttk.Combobox(
+                    rf, textvariable=op_var, values=_OP_DISP, state="readonly", width=16
+                ).pack(side="left", padx=(0, 2))
 
                 # Value entry (hidden for null checks)
                 val_var = tk.StringVar(value=cond.get("value", ""))
+
                 def _val_cb(*_, c=cond, v=val_var):
-                    c["value"] = v.get(); on_change()
+                    c["value"] = v.get()
+                    on_change()
+
                 val_var.trace_add("write", _val_cb)
                 ttk.Entry(rf, textvariable=val_var, width=12).pack(side="left", padx=(0, 2))
 
                 # Remove button
                 def _remove(idx=i):
-                    conditions.pop(idx); rebuild(); on_change()
+                    conditions.pop(idx)
+                    rebuild()
+                    on_change()
+
                 ttk.Button(rf, text="×", width=2, command=_remove).pack(side="left")
 
             # Add button
             def _add():
                 conditions.append({"column": "", "operator": "equals", "value": ""})
-                rebuild(); on_change()
-            ttk.Button(container, text="+ Add condition", command=_add).pack(anchor="w", pady=(4, 0))
+                rebuild()
+                on_change()
+
+            ttk.Button(container, text="+ Add condition", command=_add).pack(
+                anchor="w", pady=(4, 0)
+            )
 
         rebuild()
 
@@ -192,8 +213,7 @@ class FilterRows(BaseTool):
         if op == "between":
             parts = [v.strip() for v in val.split(",")]
             if len(parts) == 2:
-                return pd.to_numeric(s, errors="coerce").between(
-                    float(parts[0]), float(parts[1]))
+                return pd.to_numeric(s, errors="coerce").between(float(parts[0]), float(parts[1]))
         return pd.Series(True, index=s.index)
 
     def execute(self, params, inputs, log):
@@ -207,7 +227,7 @@ class FilterRows(BaseTool):
         masks = []
         for cond in conditions:
             col = cond.get("column", "")
-            op  = cond.get("operator", "equals")
+            op = cond.get("operator", "equals")
             val = cond.get("value", "")
             if not col or col not in df.columns:
                 continue
@@ -217,30 +237,41 @@ class FilterRows(BaseTool):
         combined = masks[0]
         for m in masks[1:]:
             combined = combined & m if logic == "AND" else combined | m
-        true_df  = df[combined].reset_index(drop=True)
+        true_df = df[combined].reset_index(drop=True)
         false_df = df[~combined].reset_index(drop=True)
         log(f"Filter: {len(true_df)} matched, {len(false_df)} excluded")
         return {"true": true_df, "false": false_df}
 
     def _cond_to_expr(self, iv: str, cond: dict) -> str:
         col = cond.get("column", "")
-        op  = cond.get("operator", "equals")
+        op = cond.get("operator", "equals")
         val = cond.get("value", "")
         c = f'{iv}["{col}"]'
-        if op == "equals":        return f'({c} == {val!r})'
-        if op == "not_equals":    return f'({c} != {val!r})'
-        if op == "greater_than":  return f'(pd.to_numeric({c}, errors="coerce") > {val})'
-        if op == "greater_eq":    return f'(pd.to_numeric({c}, errors="coerce") >= {val})'
-        if op == "less_than":     return f'(pd.to_numeric({c}, errors="coerce") < {val})'
-        if op == "less_eq":       return f'(pd.to_numeric({c}, errors="coerce") <= {val})'
-        if op == "contains":      return f'({c}.astype(str).str.contains({val!r}, case=False, na=False))'
-        if op == "starts_with":   return f'({c}.astype(str).str.startswith({val!r}))'
-        if op == "ends_with":     return f'({c}.astype(str).str.endswith({val!r}))'
-        if op == "is_null":       return f'({c}.isna())'
-        if op == "not_null":      return f'({c}.notna())'
+        if op == "equals":
+            return f"({c} == {val!r})"
+        if op == "not_equals":
+            return f"({c} != {val!r})"
+        if op == "greater_than":
+            return f'(pd.to_numeric({c}, errors="coerce") > {val})'
+        if op == "greater_eq":
+            return f'(pd.to_numeric({c}, errors="coerce") >= {val})'
+        if op == "less_than":
+            return f'(pd.to_numeric({c}, errors="coerce") < {val})'
+        if op == "less_eq":
+            return f'(pd.to_numeric({c}, errors="coerce") <= {val})'
+        if op == "contains":
+            return f"({c}.astype(str).str.contains({val!r}, case=False, na=False))"
+        if op == "starts_with":
+            return f"({c}.astype(str).str.startswith({val!r}))"
+        if op == "ends_with":
+            return f"({c}.astype(str).str.endswith({val!r}))"
+        if op == "is_null":
+            return f"({c}.isna())"
+        if op == "not_null":
+            return f"({c}.notna())"
         if op == "in_list":
             items = [v.strip() for v in val.split(",")]
-            return f'({c}.astype(str).isin({items!r}))'
+            return f"({c}.astype(str).isin({items!r}))"
         if op == "between":
             parts = [v.strip() for v in val.split(",")]
             return f'(pd.to_numeric({c}, errors="coerce").between({parts[0]}, {parts[1]}))'
@@ -250,16 +281,18 @@ class FilterRows(BaseTool):
         iv = input_vars[0] if input_vars else "df"
         conditions = [c for c in params.get("conditions", []) if c.get("column")]
         logic = params.get("logic", "AND")
-        outs  = connected_outs or ["true", "false"]
-        join  = " & " if logic == "AND" else " | "
+        outs = connected_outs or ["true", "false"]
+        join = " & " if logic == "AND" else " | "
         if conditions:
-            exprs   = [self._cond_to_expr(iv, c) for c in conditions]
+            exprs = [self._cond_to_expr(iv, c) for c in conditions]
             mask_expr = join.join(exprs)
         else:
             mask_expr = f"pd.Series(True, index={iv}.index)"
         lines = [f"_mask = {mask_expr}"]
-        if "true"  in outs: lines.append(f"{output_var}_true  = {iv}[_mask].reset_index(drop=True)")
-        if "false" in outs: lines.append(f"{output_var}_false = {iv}[~_mask].reset_index(drop=True)")
+        if "true" in outs:
+            lines.append(f"{output_var}_true = {iv}[_mask].reset_index(drop=True)")
+        if "false" in outs:
+            lines.append(f"{output_var}_false = {iv}[~_mask].reset_index(drop=True)")
         return lines
 
     def subtitle(self, params):
@@ -279,21 +312,30 @@ class Sort(BaseTool):
         cols = columns if isinstance(columns, list) else []
         fields = [
             {"key": "column", "type": "combobox", "values": cols, "width": 14},
-            {"key": "order",  "type": "combobox",
-             "values": ["ascending", "descending"], "width": 11},
+            {
+                "key": "order",
+                "type": "combobox",
+                "values": ["ascending", "descending"],
+                "width": 11,
+            },
         ]
-        ttk.Label(parent, text="Sort rules:").grid(
-            row=0, column=0, sticky="w", padx=4, pady=(4, 0))
-        self.add_dynamic_rows(parent, "rules", params, on_change, fields,
-                              default_row={"column": "", "order": "ascending"},
-                              add_label="+ Add sort rule")
+        ttk.Label(parent, text="Sort rules:").grid(row=0, column=0, sticky="w", padx=4, pady=(4, 0))
+        self.add_dynamic_rows(
+            parent,
+            "rules",
+            params,
+            on_change,
+            fields,
+            default_row={"column": "", "order": "ascending"},
+            add_label="+ Add sort rule",
+        )
 
     def execute(self, params, inputs, log):
         df = inputs.get("data")
         if df is None:
             raise ValueError("No input")
         rules = params.get("rules", [])
-        by  = [r["column"] for r in rules if r.get("column")]
+        by = [r["column"] for r in rules if r.get("column")]
         asc = [r.get("order", "ascending") == "ascending" for r in rules if r.get("column")]
         if not by:
             return {"data": df}
@@ -302,15 +344,17 @@ class Sort(BaseTool):
     def to_code(self, params, input_vars, output_var, connected_outs=None):
         iv = input_vars[0] if input_vars else "df"
         rules = params.get("rules", [])
-        by  = [r["column"] for r in rules if r.get("column")]
+        by = [r["column"] for r in rules if r.get("column")]
         asc = [r.get("order", "ascending") == "ascending" for r in rules if r.get("column")]
         if not by:
             return [f"{output_var} = {iv}.copy()"]
-        return [f"{output_var} = {iv}.sort_values(by={by!r}, ascending={asc!r}).reset_index(drop=True)"]
+        return [
+            f"{output_var} = {iv}.sort_values(by={by!r}, ascending={asc!r}).reset_index(drop=True)"
+        ]
 
     def subtitle(self, params):
         rules = params.get("rules", [])
-        cols  = [r.get("column", "") for r in rules if r.get("column")]
+        cols = [r.get("column", "") for r in rules if r.get("column")]
         return ", ".join(cols[:3]) or "not configured"
 
 
@@ -358,7 +402,8 @@ class RenameColumns(BaseTool):
         params.setdefault("renames", [])
 
         ttk.Label(parent, text="Rename rules  (old column → new name):").grid(
-            row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2))
+            row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2)
+        )
 
         container = ttk.Frame(parent)
         container.grid(row=1, column=0, columnspan=2, sticky="ew", padx=4)
@@ -376,38 +421,49 @@ class RenameColumns(BaseTool):
 
                 # Old column dropdown
                 from_var = tk.StringVar(value=rule.get("from", ""))
-                def _from_cb(*_, r=rule, v=from_var):
-                    r["from"] = v.get(); on_change()
-                from_var.trace_add("write", _from_cb)
-                ttk.Combobox(rf, textvariable=from_var, values=cols,
-                             width=14).pack(side="left", padx=(0, 2))
 
-                tk.Label(rf, text="→", bg="#252535", fg="#7878a0",
-                         font=("Segoe UI", 9)).pack(side="left", padx=2)
+                def _from_cb(*_, r=rule, v=from_var):
+                    r["from"] = v.get()
+                    on_change()
+
+                from_var.trace_add("write", _from_cb)
+                ttk.Combobox(rf, textvariable=from_var, values=cols, width=14).pack(
+                    side="left", padx=(0, 2)
+                )
+
+                tk.Label(rf, text="→", bg="#252535", fg="#7878a0", font=("Segoe UI", 9)).pack(
+                    side="left", padx=2
+                )
 
                 # New name entry
                 to_var = tk.StringVar(value=rule.get("to", ""))
+
                 def _to_cb(*_, r=rule, v=to_var):
-                    r["to"] = v.get(); on_change()
+                    r["to"] = v.get()
+                    on_change()
+
                 to_var.trace_add("write", _to_cb)
                 ttk.Entry(rf, textvariable=to_var, width=14).pack(side="left", padx=(0, 2))
 
                 def _remove(idx=i):
-                    renames.pop(idx); rebuild(); on_change()
+                    renames.pop(idx)
+                    rebuild()
+                    on_change()
+
                 ttk.Button(rf, text="×", width=2, command=_remove).pack(side="left")
 
             def _add():
                 renames.append({"from": "", "to": ""})
-                rebuild(); on_change()
+                rebuild()
+                on_change()
+
             ttk.Button(container, text="+ Add rename", command=_add).pack(anchor="w", pady=(4, 0))
 
         rebuild()
 
     def _get_mapping(self, params) -> dict:
         return {
-            r["from"]: r["to"]
-            for r in params.get("renames", [])
-            if r.get("from") and r.get("to")
+            r["from"]: r["to"] for r in params.get("renames", []) if r.get("from") and r.get("to")
         }
 
     def execute(self, params, inputs, log):
@@ -429,6 +485,7 @@ class RenameColumns(BaseTool):
 
 class EditColumns(BaseTool):
     """Change data types of columns (string ↔ numeric ↔ datetime ↔ category)."""
+
     node_type = "edit_columns"
     display_name = "Edit Columns"
     color = "#2a85c4"
@@ -437,26 +494,39 @@ class EditColumns(BaseTool):
 
     _DTYPES = ["str", "int (Int64)", "float", "bool", "datetime", "category"]
     _DTYPE_MAP = {
-        "str": "str", "int (Int64)": "int", "float": "float",
-        "bool": "bool", "datetime": "datetime", "category": "category",
+        "str": "str",
+        "int (Int64)": "int",
+        "float": "float",
+        "bool": "bool",
+        "datetime": "datetime",
+        "category": "category",
     }
 
     def build_config(self, parent, params, on_change, columns=None):
         cols = columns if isinstance(columns, list) else []
         ttk.Label(parent, text="Convert column data types:").grid(
-            row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2))
-        ttk.Label(parent,
-                  text="int/float → numeric  |  str → text  |  datetime → date parsing",
-                  foreground="#7878a0", font=("Segoe UI", 7)).grid(
-            row=1, column=0, columnspan=2, sticky="w", padx=4, pady=(0, 4))
+            row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2)
+        )
+        ttk.Label(
+            parent,
+            text="int/float → numeric  |  str → text  |  datetime → date parsing",
+            foreground="#7878a0",
+            font=("Segoe UI", 7),
+        ).grid(row=1, column=0, columnspan=2, sticky="w", padx=4, pady=(0, 4))
 
         fields = [
-            {"key": "column", "type": "combobox", "values": cols,  "width": 14},
-            {"key": "dtype",  "type": "combobox", "values": self._DTYPES, "width": 11},
+            {"key": "column", "type": "combobox", "values": cols, "width": 14},
+            {"key": "dtype", "type": "combobox", "values": self._DTYPES, "width": 11},
         ]
-        self.add_dynamic_rows(parent, "conversions", params, on_change, fields,
-                              default_row={"column": "", "dtype": "str"},
-                              add_label="+ Add conversion")
+        self.add_dynamic_rows(
+            parent,
+            "conversions",
+            params,
+            on_change,
+            fields,
+            default_row={"column": "", "dtype": "str"},
+            add_label="+ Add conversion",
+        )
 
     def execute(self, params, inputs, log):
         df = inputs.get("data")
@@ -464,7 +534,7 @@ class EditColumns(BaseTool):
             raise ValueError("No input")
         df = df.copy()
         for conv in params.get("conversions", []):
-            col   = conv.get("column")
+            col = conv.get("column")
             dtype = self._DTYPE_MAP.get(conv.get("dtype", "str"), "str")
             if not col or col not in df.columns:
                 continue
@@ -490,15 +560,19 @@ class EditColumns(BaseTool):
         iv = input_vars[0] if input_vars else "df"
         lines = [f"{output_var} = {iv}.copy()"]
         for conv in params.get("conversions", []):
-            col   = conv.get("column")
+            col = conv.get("column")
             dtype = self._DTYPE_MAP.get(conv.get("dtype", "str"), "str")
             if not col:
                 continue
             if dtype == "datetime":
-                lines.append(f'{output_var}["{col}"] = pd.to_datetime({output_var}["{col}"], errors="coerce")')
+                lines.append(
+                    f'{output_var}["{col}"] = pd.to_datetime({output_var}["{col}"], errors="coerce")'
+                )
             elif dtype in ("int", "float"):
                 suffix = '.astype("Int64")' if dtype == "int" else ".astype(float)"
-                lines.append(f'{output_var}["{col}"] = pd.to_numeric({output_var}["{col}"], errors="coerce"){suffix}')
+                lines.append(
+                    f'{output_var}["{col}"] = pd.to_numeric({output_var}["{col}"], errors="coerce"){suffix}'
+                )
             else:
                 lines.append(f'{output_var}["{col}"] = {output_var}["{col}"].astype("{dtype}")')
         return lines
@@ -519,7 +593,8 @@ class AddColumns(BaseTool):
         params.setdefault("new_cols", [])
 
         ttk.Label(parent, text="New columns  (name + formula):").grid(
-            row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2))
+            row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2)
+        )
 
         container = ttk.Frame(parent)
         container.grid(row=1, column=0, columnspan=2, sticky="ew", padx=4)
@@ -537,22 +612,42 @@ class AddColumns(BaseTool):
 
                 # Name entry
                 nm_var = tk.StringVar(value=col.get("name", ""))
-                def _nm(*_, c=col, v=nm_var): c["name"] = v.get(); on_change()
-                nm_var.trace_add("write", _nm)
-                ttk.Label(rf, text="Name").grid(row=0, column=0, sticky="w", padx=(0,2))
-                ttk.Entry(rf, textvariable=nm_var, width=12).grid(row=0, column=1, sticky="ew", padx=(0,2))
 
-                def _rm(idx=i): new_cols.pop(idx); rebuild(); on_change()
+                def _nm(*_, c=col, v=nm_var):
+                    c["name"] = v.get()
+                    on_change()
+
+                nm_var.trace_add("write", _nm)
+                ttk.Label(rf, text="Name").grid(row=0, column=0, sticky="w", padx=(0, 2))
+                ttk.Entry(rf, textvariable=nm_var, width=12).grid(
+                    row=0, column=1, sticky="ew", padx=(0, 2)
+                )
+
+                def _rm(idx=i):
+                    new_cols.pop(idx)
+                    rebuild()
+                    on_change()
+
                 ttk.Button(rf, text="×", width=2, command=_rm).grid(row=0, column=2)
 
                 # Formula entry
                 fm_var = tk.StringVar(value=col.get("formula", ""))
-                def _fm(*_, c=col, v=fm_var): c["formula"] = v.get(); on_change()
-                fm_var.trace_add("write", _fm)
-                ttk.Label(rf, text="Formula").grid(row=1, column=0, sticky="w", padx=(0,2))
-                ttk.Entry(rf, textvariable=fm_var, width=24).grid(row=1, column=1, columnspan=2, sticky="ew")
 
-            def _add(): new_cols.append({"name": "", "formula": ""}); rebuild(); on_change()
+                def _fm(*_, c=col, v=fm_var):
+                    c["formula"] = v.get()
+                    on_change()
+
+                fm_var.trace_add("write", _fm)
+                ttk.Label(rf, text="Formula").grid(row=1, column=0, sticky="w", padx=(0, 2))
+                ttk.Entry(rf, textvariable=fm_var, width=24).grid(
+                    row=1, column=1, columnspan=2, sticky="ew"
+                )
+
+            def _add():
+                new_cols.append({"name": "", "formula": ""})
+                rebuild()
+                on_change()
+
             ttk.Button(container, text="+ Add column", command=_add).pack(anchor="w", pady=(4, 0))
 
         rebuild()
@@ -560,10 +655,18 @@ class AddColumns(BaseTool):
         # Formula guide
         sep_row = parent.grid_size()[1]
         ttk.Separator(parent, orient="horizontal").grid(
-            row=sep_row, column=0, columnspan=2, sticky="ew", pady=(8, 2))
-        guide = tk.Text(parent, height=10, bg="#0d0d1a", fg="#888888",
-                        font=("Courier New", 7), state="normal", relief="flat",
-                        wrap="word")
+            row=sep_row, column=0, columnspan=2, sticky="ew", pady=(8, 2)
+        )
+        guide = tk.Text(
+            parent,
+            height=10,
+            bg="#0d0d1a",
+            fg="#888888",
+            font=("Courier New", 7),
+            state="normal",
+            relief="flat",
+            wrap="word",
+        )
         guide.insert("1.0", _ADD_COL_HELP)
         guide.configure(state="disabled")
         guide.grid(row=sep_row + 1, column=0, columnspan=2, sticky="ew", padx=4, pady=(0, 4))
@@ -574,9 +677,10 @@ class AddColumns(BaseTool):
             raise ValueError("No input")
         df = df.copy()
         import numpy as np
+
         ctx = {"df": df, "pd": pd, "np": np, **{c: df[c] for c in df.columns}}
         for col_def in params.get("new_cols", []):
-            name    = (col_def.get("name") or "").strip()
+            name = (col_def.get("name") or "").strip()
             formula = (col_def.get("formula") or "").strip()
             if not name or not formula:
                 continue
@@ -594,7 +698,7 @@ class AddColumns(BaseTool):
         iv = input_vars[0] if input_vars else "df"
         lines = [f"{output_var} = {iv}.copy()"]
         for col_def in params.get("new_cols", []):
-            name    = (col_def.get("name") or "").strip()
+            name = (col_def.get("name") or "").strip()
             formula = (col_def.get("formula") or "").strip()
             if name and formula:
                 lines.append(f'{output_var}["{name}"] = {output_var}.eval({formula!r})')
@@ -614,16 +718,15 @@ class Cleansing(BaseTool):
 
     def build_config(self, parent, params, on_change, columns=None):
         cols = columns if isinstance(columns, list) else []
-        self.add_column_multiselect(parent, "Columns", "columns",
-                                    params, on_change, 0, cols)
-        self.add_checkbox(parent, "Trim whitespace",       "trim",          params, on_change, 1)
-        self.add_checkbox(parent, "Collapse spaces",       "collapse",      params, on_change, 2)
-        self.add_checkbox(parent, "Remove tabs/newlines",  "rm_ctrl",       params, on_change, 3)
-        self.add_combobox(parent, "Case", "case",
-                          ["none", "upper", "lower", "title"],
-                          params, on_change, 4)
-        self.add_checkbox(parent, "Null → blank string",  "null_to_blank",  params, on_change, 5)
-        self.add_checkbox(parent, "Drop all-null rows",   "drop_null_rows", params, on_change, 6)
+        self.add_column_multiselect(parent, "Columns", "columns", params, on_change, 0, cols)
+        self.add_checkbox(parent, "Trim whitespace", "trim", params, on_change, 1)
+        self.add_checkbox(parent, "Collapse spaces", "collapse", params, on_change, 2)
+        self.add_checkbox(parent, "Remove tabs/newlines", "rm_ctrl", params, on_change, 3)
+        self.add_combobox(
+            parent, "Case", "case", ["none", "upper", "lower", "title"], params, on_change, 4
+        )
+        self.add_checkbox(parent, "Null → blank string", "null_to_blank", params, on_change, 5)
+        self.add_checkbox(parent, "Drop all-null rows", "drop_null_rows", params, on_change, 6)
 
     def execute(self, params, inputs, log):
         df = inputs.get("data")
@@ -646,9 +749,12 @@ class Cleansing(BaseTool):
             if params.get("rm_ctrl"):
                 s = s.str.replace(r"[\t\n\r]", " ", regex=True)
             case = params.get("case", "none")
-            if case == "upper":   s = s.str.upper()
-            elif case == "lower": s = s.str.lower()
-            elif case == "title": s = s.str.title()
+            if case == "upper":
+                s = s.str.upper()
+            elif case == "lower":
+                s = s.str.lower()
+            elif case == "title":
+                s = s.str.title()
             if params.get("null_to_blank"):
                 df[col] = df[col].fillna("").astype(str)
             else:
@@ -663,8 +769,10 @@ class Cleansing(BaseTool):
 
     def subtitle(self, params):
         ops = []
-        if params.get("trim"):    ops.append("trim")
-        if params.get("case", "none") != "none": ops.append(params["case"])
+        if params.get("trim"):
+            ops.append("trim")
+        if params.get("case", "none") != "none":
+            ops.append(params["case"])
         return ", ".join(ops) if ops else "not configured"
 
 
@@ -676,23 +784,22 @@ class RecordID(BaseTool):
     outs = ["data"]
 
     def build_config(self, parent, params, on_change, columns=None):
-        self.add_entry(parent,   "Field name",  "field_name", params, on_change, 0)
-        self.add_entry(parent,   "Start value", "start",      params, on_change, 1, width=8)
-        self.add_combobox(parent, "Position", "position",
-                          ["first", "last"], params, on_change, 2)
+        self.add_entry(parent, "Field name", "field_name", params, on_change, 0)
+        self.add_entry(parent, "Start value", "start", params, on_change, 1, width=8)
+        self.add_combobox(parent, "Position", "position", ["first", "last"], params, on_change, 2)
         params.setdefault("field_name", "id")
-        params.setdefault("start",      "1")
-        params.setdefault("position",   "first")
+        params.setdefault("start", "1")
+        params.setdefault("position", "first")
 
     def execute(self, params, inputs, log):
         df = inputs.get("data")
         if df is None:
             raise ValueError("No input")
-        df    = df.copy()
-        name  = params.get("field_name") or "id"
+        df = df.copy()
+        name = params.get("field_name") or "id"
         start = int(params.get("start") or 1)
-        pos   = params.get("position", "first")
-        ids   = range(start, start + len(df))
+        pos = params.get("position", "first")
+        ids = range(start, start + len(df))
         if pos == "first":
             df.insert(0, name, ids)
         else:
@@ -700,16 +807,18 @@ class RecordID(BaseTool):
         return {"data": df}
 
     def to_code(self, params, input_vars, output_var, connected_outs=None):
-        iv    = input_vars[0] if input_vars else "df"
-        name  = params.get("field_name") or "id"
+        iv = input_vars[0] if input_vars else "df"
+        name = params.get("field_name") or "id"
         start = int(params.get("start") or 1)
-        pos   = params.get("position", "first")
+        pos = params.get("position", "first")
         lines = [f"{output_var} = {iv}.copy()"]
         if pos == "first":
-            lines.append(f'{output_var}.insert(0, "{name}", range({start}, {start} + len({output_var})))')
+            lines.append(
+                f'{output_var}.insert(0, "{name}", range({start}, {start} + len({output_var})))'
+            )
         else:
             lines.append(f'{output_var}["{name}"] = range({start}, {start} + len({output_var}))')
         return lines
 
     def subtitle(self, params):
-        return f"{params.get('field_name','id')} from {params.get('start',1)}"
+        return f"{params.get('field_name', 'id')} from {params.get('start', 1)}"

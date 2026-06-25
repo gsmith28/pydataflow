@@ -5,10 +5,11 @@ Every tool is a subclass of BaseTool registered in nodes/__init__.py.
 Subclasses must set the class attributes and override the three contract
 methods: build_config, execute, to_code.
 """
+
 from __future__ import annotations
+
 import tkinter as tk
-from tkinter import ttk, filedialog
-from typing import Any
+from tkinter import filedialog, ttk
 
 
 class BaseTool:
@@ -41,8 +42,9 @@ class BaseTool:
 
     # --- contract methods ---------------------------------------------------
 
-    def build_config(self, parent: tk.Widget, params: dict,
-                     on_change, columns: list[str] | None = None) -> None:
+    def build_config(
+        self, parent: tk.Widget, params: dict, on_change, columns: list[str] | None = None
+    ) -> None:
         """Build the configuration UI for this tool into *parent*.
 
         *params* is mutated in place as the user edits widgets.
@@ -63,8 +65,13 @@ class BaseTool:
         """
         return {}
 
-    def to_code(self, params: dict, input_vars: list[str],
-                output_var: str, connected_outs: list[str] | None = None) -> list[str]:
+    def to_code(
+        self,
+        params: dict,
+        input_vars: list[str],
+        output_var: str,
+        connected_outs: list[str] | None = None,
+    ) -> list[str]:
         """Return Python source lines equivalent to execute() for export.
 
         *input_vars*     -- variable names for each input port (same order as self.ins)
@@ -87,53 +94,86 @@ class BaseTool:
         ttk.Label(parent, text=text).grid(row=row, column=0, sticky="nw", padx=(4, 2), pady=2)
         parent.columnconfigure(1, weight=1)
 
-    def add_entry(self, parent: tk.Widget, label: str, key: str,
-                  params: dict, on_change, row: int,
-                  width: int = 22) -> tk.StringVar:
+    def add_entry(
+        self,
+        parent: tk.Widget,
+        label: str,
+        key: str,
+        params: dict,
+        on_change,
+        row: int,
+        width: int = 22,
+    ) -> tk.StringVar:
         var = tk.StringVar(value=str(params.get(key, "")))
+
         def _cb(*_):
             params[key] = var.get()
             on_change()
+
         var.trace_add("write", _cb)
         self._lbl(parent, label, row)
         ttk.Entry(parent, textvariable=var, width=width).grid(
-            row=row, column=1, sticky="ew", padx=4, pady=2)
+            row=row, column=1, sticky="ew", padx=4, pady=2
+        )
         return var
 
-    def add_combobox(self, parent: tk.Widget, label: str, key: str,
-                     values: list[str], params: dict, on_change,
-                     row: int) -> tk.StringVar:
+    def add_combobox(
+        self,
+        parent: tk.Widget,
+        label: str,
+        key: str,
+        values: list[str],
+        params: dict,
+        on_change,
+        row: int,
+    ) -> tk.StringVar:
         cur = str(params.get(key, values[0] if values else ""))
         var = tk.StringVar(value=cur)
+
         def _cb(*_):
             params[key] = var.get()
             on_change()
+
         var.trace_add("write", _cb)
         self._lbl(parent, label, row)
-        ttk.Combobox(parent, textvariable=var, values=values,
-                     state="readonly").grid(row=row, column=1, sticky="ew", padx=4, pady=2)
+        ttk.Combobox(parent, textvariable=var, values=values, state="readonly").grid(
+            row=row, column=1, sticky="ew", padx=4, pady=2
+        )
         return var
 
-    def add_checkbox(self, parent: tk.Widget, label: str, key: str,
-                     params: dict, on_change, row: int) -> tk.BooleanVar:
+    def add_checkbox(
+        self, parent: tk.Widget, label: str, key: str, params: dict, on_change, row: int
+    ) -> tk.BooleanVar:
         var = tk.BooleanVar(value=bool(params.get(key, False)))
+
         def _cb(*_):
             params[key] = var.get()
             on_change()
+
         var.trace_add("write", _cb)
         ttk.Checkbutton(parent, text=label, variable=var).grid(
-            row=row, column=0, columnspan=2, sticky="w", padx=4, pady=2)
+            row=row, column=0, columnspan=2, sticky="w", padx=4, pady=2
+        )
         return var
 
-    def add_file_picker(self, parent: tk.Widget, label: str, key: str,
-                        params: dict, on_change, row: int,
-                        filetypes: list | None = None,
-                        save: bool = False,
-                        default_ext: str = "") -> tk.StringVar:
+    def add_file_picker(
+        self,
+        parent: tk.Widget,
+        label: str,
+        key: str,
+        params: dict,
+        on_change,
+        row: int,
+        filetypes: list | None = None,
+        save: bool = False,
+        default_ext: str = "",
+    ) -> tk.StringVar:
         var = tk.StringVar(value=str(params.get(key, "")))
+
         def _cb(*_):
             params[key] = var.get()
             on_change()
+
         var.trace_add("write", _cb)
 
         def browse():
@@ -153,24 +193,40 @@ class BaseTool:
         ttk.Button(fr, text="…", width=3, command=browse).grid(row=0, column=1, padx=(2, 0))
         return var
 
-    def add_column_dropdown(self, parent: tk.Widget, label: str, key: str,
-                             params: dict, on_change, row: int,
-                             columns: list[str]) -> tk.StringVar:
+    def add_column_dropdown(
+        self,
+        parent: tk.Widget,
+        label: str,
+        key: str,
+        params: dict,
+        on_change,
+        row: int,
+        columns: list[str],
+    ) -> tk.StringVar:
         vals = columns or []
         cur = str(params.get(key, ""))
         var = tk.StringVar(value=cur)
+
         def _cb(*_):
             params[key] = var.get()
             on_change()
+
         var.trace_add("write", _cb)
         self._lbl(parent, label, row)
         cb = ttk.Combobox(parent, textvariable=var, values=vals)
         cb.grid(row=row, column=1, sticky="ew", padx=4, pady=2)
         return var
 
-    def add_column_multiselect(self, parent: tk.Widget, label: str, key: str,
-                                params: dict, on_change, row: int,
-                                columns: list[str]) -> tk.Listbox:
+    def add_column_multiselect(
+        self,
+        parent: tk.Widget,
+        label: str,
+        key: str,
+        params: dict,
+        on_change,
+        row: int,
+        columns: list[str],
+    ) -> tk.Listbox:
         cols = columns or []
         current = params.get(key, [])
         if isinstance(current, str):
@@ -181,10 +237,16 @@ class BaseTool:
         fr.grid(row=row, column=1, sticky="ew", padx=4, pady=2)
         fr.columnconfigure(0, weight=1)
 
-        lb = tk.Listbox(fr, selectmode=tk.MULTIPLE, height=5,
-                        bg="#1a1a28", fg="#c0c0d8",
-                        selectbackground="#5588ff", exportselection=False,
-                        font=("Segoe UI", 8))
+        lb = tk.Listbox(
+            fr,
+            selectmode=tk.MULTIPLE,
+            height=5,
+            bg="#1a1a28",
+            fg="#c0c0d8",
+            selectbackground="#5588ff",
+            exportselection=False,
+            font=("Segoe UI", 8),
+        )
         sb = ttk.Scrollbar(fr, orient="vertical", command=lb.yview)
         lb.configure(yscrollcommand=sb.set)
         lb.grid(row=0, column=0, sticky="ew")
@@ -204,9 +266,16 @@ class BaseTool:
         lb.bind("<<ListboxSelect>>", on_sel)
         return lb
 
-    def add_textarea(self, parent: tk.Widget, label: str, key: str,
-                     params: dict, on_change, row: int,
-                     height: int = 4) -> tk.Text:
+    def add_textarea(
+        self,
+        parent: tk.Widget,
+        label: str,
+        key: str,
+        params: dict,
+        on_change,
+        row: int,
+        height: int = 4,
+    ) -> tk.Text:
         if label:
             self._lbl(parent, label, row)
             col = 1
@@ -217,9 +286,16 @@ class BaseTool:
         fr.grid(row=row, column=col, columnspan=(2 - col), sticky="ew", padx=4, pady=2)
         fr.columnconfigure(0, weight=1)
 
-        ta = tk.Text(fr, height=height, bg="#1a1a28", fg="#c0c0d8",
-                     insertbackground="#ffffff", font=("Segoe UI", 8), wrap="word",
-                     relief="flat")
+        ta = tk.Text(
+            fr,
+            height=height,
+            bg="#1a1a28",
+            fg="#c0c0d8",
+            insertbackground="#ffffff",
+            font=("Segoe UI", 8),
+            wrap="word",
+            relief="flat",
+        )
         sb = ttk.Scrollbar(fr, orient="vertical", command=ta.yview)
         ta.configure(yscrollcommand=sb.set)
         ta.grid(row=0, column=0, sticky="ew")
@@ -233,10 +309,16 @@ class BaseTool:
         ta.bind("<KeyRelease>", on_key)
         return ta
 
-    def add_dynamic_rows(self, parent: tk.Widget, key: str, params: dict,
-                         on_change, fields: list[dict],
-                         default_row: dict | None = None,
-                         add_label: str = "+ Add row") -> None:
+    def add_dynamic_rows(
+        self,
+        parent: tk.Widget,
+        key: str,
+        params: dict,
+        on_change,
+        fields: list[dict],
+        default_row: dict | None = None,
+        add_label: str = "+ Add row",
+    ) -> None:
         """
         fields: list of {"key": str, "label": str, "type": "entry"|"combobox",
                           "values": [...], "width": int}
@@ -244,8 +326,9 @@ class BaseTool:
         rows: list[dict] = params.setdefault(key, [])
 
         container = ttk.Frame(parent)
-        container.grid(row=parent.grid_size()[1], column=0, columnspan=2,
-                       sticky="ew", padx=4, pady=2)
+        container.grid(
+            row=parent.grid_size()[1], column=0, columnspan=2, sticky="ew", padx=4, pady=2
+        )
         parent.columnconfigure(0, weight=1)
 
         def rebuild():
@@ -254,22 +337,29 @@ class BaseTool:
             for ri, rdata in enumerate(rows):
                 rf = ttk.Frame(container)
                 rf.pack(fill="x", pady=1)
-                for fi, fdef in enumerate(fields):
+                for _fi, fdef in enumerate(fields):
                     fkey = fdef["key"]
                     ftype = fdef.get("type", "entry")
                     fwidth = fdef.get("width", 10)
                     if ftype == "combobox":
                         fvals = fdef.get("values", [])
                         var = tk.StringVar(value=str(rdata.get(fkey, fvals[0] if fvals else "")))
+
                         def _cb(*_, r=rdata, k=fkey, v=var):
-                            r[k] = v.get(); on_change()
+                            r[k] = v.get()
+                            on_change()
+
                         var.trace_add("write", _cb)
-                        ttk.Combobox(rf, textvariable=var, values=fvals,
-                                     state="readonly", width=fwidth).pack(side="left", padx=1)
+                        ttk.Combobox(
+                            rf, textvariable=var, values=fvals, state="readonly", width=fwidth
+                        ).pack(side="left", padx=1)
                     else:
                         var = tk.StringVar(value=str(rdata.get(fkey, "")))
+
                         def _cb(*_, r=rdata, k=fkey, v=var):
-                            r[k] = v.get(); on_change()
+                            r[k] = v.get()
+                            on_change()
+
                         var.trace_add("write", _cb)
                         ttk.Entry(rf, textvariable=var, width=fwidth).pack(side="left", padx=1)
 
@@ -277,12 +367,14 @@ class BaseTool:
                     rows.pop(i)
                     rebuild()
                     on_change()
+
                 ttk.Button(rf, text="×", width=2, command=remove_row).pack(side="left", padx=1)
 
             def add_row():
                 rows.append(dict(default_row or {f["key"]: "" for f in fields}))
                 rebuild()
                 on_change()
+
             ttk.Button(container, text=add_label, command=add_row).pack(anchor="w", pady=(2, 0))
 
         rebuild()

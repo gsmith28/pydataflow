@@ -7,20 +7,47 @@ Imports all built-in tool classes, instantiates them, and exposes:
 
 To register a new tool: add it to the import list and to _tools below.
 """
-from nodes.input_output import ImportCSV, ImportExcel, ShowTable, ExportCSV, ExportExcel
-from nodes.preparation import (SelectColumns, FilterRows, Sort, HeadTail, RenameColumns,
-                                EditColumns, AddColumns, Cleansing, RecordID)
-from nodes.join import MergeJoin, Union, UniqueDuplicate
-from nodes.transform import Summarize, GroupBy, Pivot, Unpivot
+
 from nodes.documentation import Comment, Container
+from nodes.input_output import ExportCSV, ExportExcel, ImportCSV, ImportExcel, ShowTable
+from nodes.join import MergeJoin, Union, UniqueDuplicate
+from nodes.preparation import (
+    AddColumns,
+    Cleansing,
+    EditColumns,
+    FilterRows,
+    HeadTail,
+    RecordID,
+    RenameColumns,
+    SelectColumns,
+    Sort,
+)
+from nodes.transform import GroupBy, Pivot, Summarize, Unpivot
 
 _tools: list = [
-    ImportCSV(), ImportExcel(), ShowTable(), ExportCSV(), ExportExcel(),
-    SelectColumns(), FilterRows(), Sort(), HeadTail(), RenameColumns(),
-    EditColumns(), AddColumns(), Cleansing(), RecordID(),
-    MergeJoin(), Union(), UniqueDuplicate(),
-    Summarize(), GroupBy(), Pivot(), Unpivot(),
-    Comment(), Container(),
+    ImportCSV(),
+    ImportExcel(),
+    ShowTable(),
+    ExportCSV(),
+    ExportExcel(),
+    SelectColumns(),
+    FilterRows(),
+    Sort(),
+    HeadTail(),
+    RenameColumns(),
+    EditColumns(),
+    AddColumns(),
+    Cleansing(),
+    RecordID(),
+    MergeJoin(),
+    Union(),
+    UniqueDuplicate(),
+    Summarize(),
+    GroupBy(),
+    Pivot(),
+    Unpivot(),
+    Comment(),
+    Container(),
 ]
 
 REGISTRY: dict = {t.node_type: t for t in _tools}

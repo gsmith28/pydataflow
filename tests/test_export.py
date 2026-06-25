@@ -1,8 +1,6 @@
 """Tests for export_script.py — Python code generation."""
-import textwrap
-import pytest
-import pandas as pd
-from engine import Node, Edge
+
+from engine import Edge, Node
 from export_script import generate_python
 
 
@@ -46,7 +44,7 @@ def test_generate_chain_produces_correct_var_references(tmp_path):
     n2.params["rules"] = [{"column": "score", "order": "descending"}]
     code = generate_python([n1, n2], [Edge(n1.id, "data", n2.id, "data")])
     # n2's generated line should reference n1's variable
-    lines = [l for l in code.splitlines() if "sort_values" in l]
+    lines = [line for line in code.splitlines() if "sort_values" in line]
     assert lines, "Expected a sort_values line in exported code"
     assert f"df_import_csv_{n1.id}" in lines[0]
 
@@ -54,10 +52,13 @@ def test_generate_chain_produces_correct_var_references(tmp_path):
 def test_generate_cycle_returns_error_comment():
     a = Node("filter_rows", 0, 0)
     b = Node("sort", 200, 0)
-    code = generate_python([a, b], [
-        Edge(a.id, "data", b.id, "data"),
-        Edge(b.id, "data", a.id, "data"),
-    ])
+    code = generate_python(
+        [a, b],
+        [
+            Edge(a.id, "data", b.id, "data"),
+            Edge(b.id, "data", a.id, "data"),
+        ],
+    )
     assert "Export failed" in code
 
 

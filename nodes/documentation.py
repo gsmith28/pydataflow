@@ -3,9 +3,12 @@
 These are visual-only nodes (is_visual_only = True) — they have no input/output
 ports and never participate in data flow or code export.
 """
+
 from __future__ import annotations
+
 import tkinter as tk
-from tkinter import ttk, colorchooser
+from tkinter import colorchooser, ttk
+
 from nodes.base import BaseTool
 
 
@@ -56,14 +59,14 @@ class Container(BaseTool):
         color_frame = ttk.Frame(parent)
         color_frame.grid(row=2, column=1, sticky="ew", padx=4, pady=2)
 
-        preview_var = tk.StringVar(value=params.get("color", "#404060"))
-        preview_lbl = tk.Label(color_frame, bg=params.get("color", "#404060"),
-                                width=4, relief="flat")
+        tk.StringVar(value=params.get("color", "#404060"))
+        preview_lbl = tk.Label(
+            color_frame, bg=params.get("color", "#404060"), width=4, relief="flat"
+        )
         preview_lbl.pack(side="left", padx=(0, 4))
 
         def pick_color():
-            c = colorchooser.askcolor(color=params.get("color", "#404060"),
-                                      title="Container color")
+            c = colorchooser.askcolor(color=params.get("color", "#404060"), title="Container color")
             if c and c[1]:
                 params["color"] = c[1]
                 preview_lbl.configure(bg=c[1])

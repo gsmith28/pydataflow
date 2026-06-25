@@ -1,12 +1,13 @@
 """Tests for engine.py — topological sort and execute_flow."""
-import pytest
-import pandas as pd
-from engine import Node, Edge, topological_sort, execute_flow
 
+import pytest
+
+from engine import Edge, Node, execute_flow, topological_sort
 
 # ---------------------------------------------------------------------------
 # topological_sort
 # ---------------------------------------------------------------------------
+
 
 def test_sort_single_node():
     n = Node("comment", 0, 0)
@@ -24,26 +25,26 @@ def test_sort_linear_chain():
 
 def test_sort_diamond():
     """Two branches that both feed into a union."""
-    src  = Node("import_csv",  0,   0)
+    src = Node("import_csv", 0, 0)
     left = Node("filter_rows", 200, 0)
-    rgt  = Node("sort",        200, 150)
-    dst  = Node("union",       400, 75)
+    rgt = Node("sort", 200, 150)
+    dst = Node("union", 400, 75)
     edges = [
-        Edge(src.id,  "data", left.id, "data"),
-        Edge(src.id,  "data", rgt.id,  "data"),
-        Edge(left.id, "true", dst.id,  "top"),
-        Edge(rgt.id,  "data", dst.id,  "bottom"),
+        Edge(src.id, "data", left.id, "data"),
+        Edge(src.id, "data", rgt.id, "data"),
+        Edge(left.id, "true", dst.id, "top"),
+        Edge(rgt.id, "data", dst.id, "bottom"),
     ]
     order = topological_sort([src, left, rgt, dst], edges)
     assert order.index(src) < order.index(left)
     assert order.index(src) < order.index(rgt)
     assert order.index(left) < order.index(dst)
-    assert order.index(rgt)  < order.index(dst)
+    assert order.index(rgt) < order.index(dst)
 
 
 def test_sort_raises_on_cycle():
-    a = Node("filter_rows", 0,   0)
-    b = Node("sort",        200, 0)
+    a = Node("filter_rows", 0, 0)
+    b = Node("sort", 200, 0)
     edges = [Edge(a.id, "data", b.id, "data"), Edge(b.id, "data", a.id, "data")]
     with pytest.raises(ValueError, match="Cycle"):
         topological_sort([a, b], edges)
@@ -65,6 +66,7 @@ def test_sort_empty_graph():
 # execute_flow — helpers
 # ---------------------------------------------------------------------------
 
+
 def _csv_node(path: str) -> Node:
     n = Node("import_csv", 0, 0)
     n.params["file_path"] = path
@@ -76,11 +78,12 @@ def _csv_node(path: str) -> Node:
 # execute_flow
 # ---------------------------------------------------------------------------
 
+
 def test_execute_single_import(tmp_path):
     csv = tmp_path / "data.csv"
     csv.write_text("a,b\n1,2\n3,4\n")
     n = _csv_node(str(csv))
-    results = execute_flow([n], [])
+    execute_flow([n], [])
     assert n.result is not None
     df = n.result["data"]
     assert list(df.columns) == ["a", "b"]
@@ -95,8 +98,8 @@ def test_execute_filter_keeps_correct_rows(tmp_path):
     n2.params["conditions"] = [{"column": "score", "operator": "greater_than", "value": "50"}]
     n2.params["logic"] = "AND"
     execute_flow([n1, n2], [Edge(n1.id, "data", n2.id, "data")])
-    assert len(n2.result["true"])  == 2   # Alice, Carol
-    assert len(n2.result["false"]) == 1   # Bob
+    assert len(n2.result["true"]) == 2  # Alice, Carol
+    assert len(n2.result["false"]) == 1  # Bob
 
 
 def test_execute_skips_disabled_node(tmp_path):

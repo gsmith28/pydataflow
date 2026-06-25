@@ -10,9 +10,12 @@ pandas (and openpyxl for Excel nodes) — no PyDataFlow dependency at runtime.
 Disabled nodes are emitted as comments. Nodes whose output ports are not
 wired downstream are still emitted (the variable is assigned but unused).
 """
+
 from __future__ import annotations
+
 import re
-from engine import Node, Edge, topological_sort
+
+from engine import Edge, Node, topological_sort
 from nodes import get_tool
 
 HEADER = """\

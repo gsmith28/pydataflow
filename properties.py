@@ -6,12 +6,15 @@ selected it calls tool.build_config() to populate the panel with that tool's
 configuration widgets, then shows execution results (row/col counts) and a
 live-updating code preview.
 """
+
 from __future__ import annotations
+
 import tkinter as tk
 from tkinter import ttk
-from constants import PANEL_BG, DIM_FG, RESULT_OUTLINE, TEXT_FG
-from nodes import get_tool
+
 from column_inference import infer_columns
+from constants import DIM_FG, PANEL_BG, RESULT_OUTLINE
+from nodes import get_tool
 
 
 class PropertiesPanel:
@@ -24,8 +27,9 @@ class PropertiesPanel:
     def _show_empty(self) -> None:
         for w in self.parent.winfo_children():
             w.destroy()
-        ttk.Label(self.parent, text="Select a node\nto configure",
-                  justify="center", foreground=DIM_FG).pack(expand=True)
+        ttk.Label(
+            self.parent, text="Select a node\nto configure", justify="center", foreground=DIM_FG
+        ).pack(expand=True)
 
     def show_node(self, node) -> None:
         self.current_node = node
@@ -57,10 +61,16 @@ class PropertiesPanel:
         title_bar = tk.Frame(self.parent, bg=tool.color, height=32)
         title_bar.pack(fill="x")
         title_bar.pack_propagate(False)
-        tk.Label(title_bar, text=tool.display_name, bg=tool.color,
-                 fg="#ffffff", font=("Segoe UI", 10, "bold")).pack(side="left", padx=8)
-        tk.Label(title_bar, text=f"id:{node.id}", bg=tool.color,
-                 fg="#cccccc", font=("Segoe UI", 7)).pack(side="right", padx=6)
+        tk.Label(
+            title_bar,
+            text=tool.display_name,
+            bg=tool.color,
+            fg="#ffffff",
+            font=("Segoe UI", 10, "bold"),
+        ).pack(side="left", padx=8)
+        tk.Label(
+            title_bar, text=f"id:{node.id}", bg=tool.color, fg="#cccccc", font=("Segoe UI", 7)
+        ).pack(side="right", padx=6)
 
         # ── Scrollable config area ────────────────────────────────────────
         outer = ttk.Frame(self.parent)
@@ -85,14 +95,14 @@ class PropertiesPanel:
 
         def _wheel(event):
             cv.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
         cv.bind("<MouseWheel>", _wheel)
 
         # ── Column inference (per port) ───────────────────────────────────
         if len(tool.ins) == 0:
             columns: object = []
         elif len(tool.ins) == 1:
-            columns = infer_columns(node.id, tool.ins[0],
-                                    self.app.nodes, self.app.edges)
+            columns = infer_columns(node.id, tool.ins[0], self.app.nodes, self.app.edges)
         else:
             # Multi-input: pass dict keyed by port name
             columns = {
@@ -115,35 +125,46 @@ class PropertiesPanel:
         if node.result:
             r = cfg.grid_size()[1]
             ttk.Separator(cfg, orient="horizontal").grid(
-                row=r, column=0, columnspan=2, sticky="ew", pady=4)
+                row=r, column=0, columnspan=2, sticky="ew", pady=4
+            )
             for port, df in node.result.items():
                 if hasattr(df, "__len__") and hasattr(df, "columns"):
                     r = cfg.grid_size()[1]
-                    ttk.Label(cfg, text=f"{port}:",
-                              foreground=RESULT_OUTLINE).grid(
-                        row=r, column=0, sticky="w", padx=4)
-                    ttk.Label(cfg, text=f"{len(df):,} rows × {len(df.columns)} cols",
-                              foreground=RESULT_OUTLINE).grid(
-                        row=r, column=1, sticky="w", padx=4)
+                    ttk.Label(cfg, text=f"{port}:", foreground=RESULT_OUTLINE).grid(
+                        row=r, column=0, sticky="w", padx=4
+                    )
+                    ttk.Label(
+                        cfg,
+                        text=f"{len(df):,} rows × {len(df.columns)} cols",
+                        foreground=RESULT_OUTLINE,
+                    ).grid(row=r, column=1, sticky="w", padx=4)
 
         # ── Live code preview ─────────────────────────────────────────────
         r = cfg.grid_size()[1]
         ttk.Separator(cfg, orient="horizontal").grid(
-            row=r, column=0, columnspan=2, sticky="ew", pady=(6, 2))
+            row=r, column=0, columnspan=2, sticky="ew", pady=(6, 2)
+        )
         r = cfg.grid_size()[1]
         ttk.Label(cfg, text="Generated code:", foreground=DIM_FG).grid(
-            row=r, column=0, columnspan=2, sticky="w", padx=4)
+            row=r, column=0, columnspan=2, sticky="w", padx=4
+        )
         r = cfg.grid_size()[1]
 
         code_frame = ttk.Frame(cfg)
         code_frame.grid(row=r, column=0, columnspan=2, sticky="ew", padx=4, pady=2)
         code_frame.columnconfigure(0, weight=1)
 
-        code_text = tk.Text(code_frame, height=5, bg="#0d0d1a", fg="#88ccff",
-                            font=("Courier New", 8), state="disabled",
-                            relief="flat", wrap="none")
-        hscroll = ttk.Scrollbar(code_frame, orient="horizontal",
-                                 command=code_text.xview)
+        code_text = tk.Text(
+            code_frame,
+            height=5,
+            bg="#0d0d1a",
+            fg="#88ccff",
+            font=("Courier New", 8),
+            state="disabled",
+            relief="flat",
+            wrap="none",
+        )
+        hscroll = ttk.Scrollbar(code_frame, orient="horizontal", command=code_text.xview)
         code_text.configure(xscrollcommand=hscroll.set)
         code_text.grid(row=0, column=0, sticky="ew")
         hscroll.grid(row=1, column=0, sticky="ew")
@@ -153,9 +174,9 @@ class PropertiesPanel:
 
         # ── Delete button ─────────────────────────────────────────────────
         r = cfg.grid_size()[1]
-        ttk.Button(cfg, text="Delete Node",
-                   command=lambda n=node: self.app.delete_node(n)).grid(
-            row=r, column=0, columnspan=2, sticky="ew", padx=4, pady=(10, 4))
+        ttk.Button(cfg, text="Delete Node", command=lambda n=node: self.app.delete_node(n)).grid(
+            row=r, column=0, columnspan=2, sticky="ew", padx=4, pady=(10, 4)
+        )
 
 
 def _update_code(code_text: tk.Text, node) -> None:

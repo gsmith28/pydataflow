@@ -9,13 +9,27 @@ while the user is dragging a connection.
 Also provides Renderer.hit_test() which maps a screen-space mouse
 coordinate back to (node, hit_type, port_name).
 """
+
 from __future__ import annotations
-import math
+
 import tkinter as tk
+
 from constants import (
-    CANVAS_BG, NODE_BG, PANEL_BG, GRID_COLOR, EDGE_COLOR, EDGE_WIRE,
-    SELECT_OUTLINE, PORT_IN_COLOR, PORT_OUT_COLOR, RESULT_OUTLINE, DIM_FG,
-    NODE_W, NODE_H, TITLE_H, PORT_R, CONTAINER_DEFAULT_W, CONTAINER_DEFAULT_H,
+    CONTAINER_DEFAULT_H,
+    CONTAINER_DEFAULT_W,
+    DIM_FG,
+    EDGE_COLOR,
+    EDGE_WIRE,
+    GRID_COLOR,
+    NODE_BG,
+    NODE_H,
+    NODE_W,
+    PORT_IN_COLOR,
+    PORT_OUT_COLOR,
+    PORT_R,
+    RESULT_OUTLINE,
+    SELECT_OUTLINE,
+    TITLE_H,
 )
 from nodes import get_tool
 
@@ -26,8 +40,8 @@ def bezier_pts(p0, p1, p2, p3, steps: int = 20) -> list:
     for i in range(steps + 1):
         t = i / steps
         mt = 1 - t
-        x = mt**3*p0[0] + 3*mt**2*t*p1[0] + 3*mt*t**2*p2[0] + t**3*p3[0]
-        y = mt**3*p0[1] + 3*mt**2*t*p1[1] + 3*mt*t**2*p2[1] + t**3*p3[1]
+        x = mt**3 * p0[0] + 3 * mt**2 * t * p1[0] + 3 * mt * t**2 * p2[0] + t**3 * p3[0]
+        y = mt**3 * p0[1] + 3 * mt**2 * t * p1[1] + 3 * mt * t**2 * p2[1] + t**3 * p3[1]
         pts.extend([x, y])
     return pts
 
@@ -75,8 +89,8 @@ class Renderer:
         self._draw_grid(app)
 
         containers = [n for n in app.nodes if n.kind == "container"]
-        regular    = [n for n in app.nodes if n.kind != "container"]
-        hidden     = _hidden_ids(app)
+        regular = [n for n in app.nodes if n.kind != "container"]
+        hidden = _hidden_ids(app)
 
         for node in containers:
             self._draw_container_body(app, node)
@@ -100,7 +114,7 @@ class Renderer:
 
     def _draw_grid(self, app) -> None:
         c = self.canvas
-        W = c.winfo_width()  or 800
+        W = c.winfo_width() or 800
         H = c.winfo_height() or 600
         spacing = max(4, 40 * app.zoom)
         x0 = app.pan_x % spacing
@@ -125,12 +139,18 @@ class Renderer:
         th = TITLE_H * app.zoom
         color = node.params.get("color", "#404060")
         self.canvas.create_rectangle(
-            sx, sy + th, sx + sw, sy + sh,
-            fill="#1a1a2c", outline=color, dash=(4, 4), width=1)
+            sx, sy + th, sx + sw, sy + sh, fill="#1a1a2c", outline=color, dash=(4, 4), width=1
+        )
         # Resize handle
         self.canvas.create_rectangle(
-            sx + sw - 12, sy + sh - 12, sx + sw, sy + sh,
-            fill=color, outline="", tags=(f"resize_{node.id}",))
+            sx + sw - 12,
+            sy + sh - 12,
+            sx + sw,
+            sy + sh,
+            fill=color,
+            outline="",
+            tags=(f"resize_{node.id}",),
+        )
 
     def _draw_container_bar(self, app, node) -> None:
         w = node.params.get("_w", CONTAINER_DEFAULT_W)
@@ -140,19 +160,26 @@ class Renderer:
         color = node.params.get("color", "#404060")
         sel = node.id in app.selected_ids
         outline, lw = (SELECT_OUTLINE, 2) if sel else (color, 1)
-        self.canvas.create_rectangle(sx, sy, sx + sw, sy + th,
-                                      fill=color, outline=outline, width=lw,
-                                      tags=(f"node_{node.id}",))
+        self.canvas.create_rectangle(
+            sx,
+            sy,
+            sx + sw,
+            sy + th,
+            fill=color,
+            outline=outline,
+            width=lw,
+            tags=(f"node_{node.id}",),
+        )
         title = node.params.get("title", "Container")
         arrow = " ▶" if node.params.get("collapsed") else " ▼"
         fs = max(7, int(9 * app.zoom))
-        self.canvas.create_text(sx + sw / 2, sy + th / 2,
-                                 text=title + arrow,
-                                 fill="#ffffff", font=("Segoe UI", fs))
+        self.canvas.create_text(
+            sx + sw / 2, sy + th / 2, text=title + arrow, fill="#ffffff", font=("Segoe UI", fs)
+        )
 
     def _draw_proxy_edges(self, app, container, hidden: set) -> None:
         """Stub lines for edges crossing collapsed container boundary."""
-        w  = container.params.get("_w", CONTAINER_DEFAULT_W)
+        w = container.params.get("_w", CONTAINER_DEFAULT_W)
         sx, sy = self.w2s(app, container.x, container.y)
         th = TITLE_H * app.zoom
         proxy_x = sx + w * app.zoom
@@ -166,19 +193,24 @@ class Renderer:
                 if dst:
                     dx, dy = self.port_screen(app, dst, edge.dst_port, "in")
                     ctrl = max(40 * app.zoom, abs(dx - proxy_x) * 0.5)
-                    pts = bezier_pts((proxy_x, proxy_y), (proxy_x + ctrl, proxy_y),
-                                     (dx - ctrl, dy), (dx, dy))
-                    self.canvas.create_line(*pts, fill=EDGE_COLOR, width=1,
-                                            dash=(3, 3), arrow=tk.LAST,
-                                            arrowshape=(7, 9, 3))
+                    pts = bezier_pts(
+                        (proxy_x, proxy_y), (proxy_x + ctrl, proxy_y), (dx - ctrl, dy), (dx, dy)
+                    )
+                    self.canvas.create_line(
+                        *pts,
+                        fill=EDGE_COLOR,
+                        width=1,
+                        dash=(3, 3),
+                        arrow=tk.LAST,
+                        arrowshape=(7, 9, 3),
+                    )
             elif dst_hidden and not src_hidden:
                 src = app.nodes_by_id.get(edge.src_node)
                 if src:
                     ox, oy = self.port_screen(app, src, edge.src_port, "out")
                     lx, ly = sx, sy + th / 2
                     ctrl = max(40 * app.zoom, abs(lx - ox) * 0.5)
-                    pts = bezier_pts((ox, oy), (ox + ctrl, oy),
-                                     (lx - ctrl, ly), (lx, ly))
+                    pts = bezier_pts((ox, oy), (ox + ctrl, oy), (lx - ctrl, ly), (lx, ly))
                     self.canvas.create_line(*pts, fill=EDGE_COLOR, width=1, dash=(3, 3))
 
     # ── edges ─────────────────────────────────────────────────────────────
@@ -201,9 +233,14 @@ class Renderer:
 
         sel = edge.id in app.selected_edge_ids
         color, lw = (SELECT_OUTLINE, 2) if sel else (EDGE_COLOR, 1.5)
-        self.canvas.create_line(*pts, fill=color, width=lw,
-                                 arrow=tk.LAST, arrowshape=(8, 10, 3),
-                                 tags=(f"edge_{edge.id}",))
+        self.canvas.create_line(
+            *pts,
+            fill=color,
+            width=lw,
+            arrow=tk.LAST,
+            arrowshape=(8, 10, 3),
+            tags=(f"edge_{edge.id}",),
+        )
 
     # ── nodes ─────────────────────────────────────────────────────────────
 
@@ -225,56 +262,84 @@ class Renderer:
             outline, lw = "#3a3a5a", 1
 
         tag = f"node_{node.id}"
-        self.canvas.create_rectangle(sx, sy, sx + nw, sy + nh,
-                                      fill=NODE_BG, outline=outline, width=lw,
-                                      tags=(tag,))
-        self.canvas.create_rectangle(sx, sy, sx + nw, sy + th,
-                                      fill=tool.color, outline=outline, width=lw,
-                                      tags=(tag,))
+        self.canvas.create_rectangle(
+            sx, sy, sx + nw, sy + nh, fill=NODE_BG, outline=outline, width=lw, tags=(tag,)
+        )
+        self.canvas.create_rectangle(
+            sx, sy, sx + nw, sy + th, fill=tool.color, outline=outline, width=lw, tags=(tag,)
+        )
         fs = max(7, int(9 * app.zoom))
-        self.canvas.create_text(sx + nw / 2, sy + th / 2,
-                                 text=tool.display_name,
-                                 fill="#ffffff", font=("Segoe UI", fs, "bold"),
-                                 tags=(tag,))
+        self.canvas.create_text(
+            sx + nw / 2,
+            sy + th / 2,
+            text=tool.display_name,
+            fill="#ffffff",
+            font=("Segoe UI", fs, "bold"),
+            tags=(tag,),
+        )
         sub = tool.subtitle(node.params)
         if sub:
-            self.canvas.create_text(sx + nw / 2, sy + th + (nh - th) / 2,
-                                     text=sub, fill=DIM_FG,
-                                     font=("Segoe UI", max(6, int(8 * app.zoom))),
-                                     width=nw - 8, tags=(tag,))
+            self.canvas.create_text(
+                sx + nw / 2,
+                sy + th + (nh - th) / 2,
+                text=sub,
+                fill=DIM_FG,
+                font=("Segoe UI", max(6, int(8 * app.zoom))),
+                width=nw - 8,
+                tags=(tag,),
+            )
 
         if node.disabled:
-            self.canvas.create_rectangle(sx, sy, sx + nw, sy + nh,
-                                          fill="#000000", stipple="gray50",
-                                          outline="", tags=(tag,))
+            self.canvas.create_rectangle(
+                sx, sy, sx + nw, sy + nh, fill="#000000", stipple="gray50", outline="", tags=(tag,)
+            )
 
         pr = PORT_R * app.zoom
         for port in tool.ins:
             px, py = self.port_screen(app, node, port, "in")
             hov = app.hover_port == (node.id, port, "in")
-            self.canvas.create_oval(px - pr, py - pr, px + pr, py + pr,
-                                     fill="#ffffff" if hov else PORT_IN_COLOR,
-                                     outline="#1a1a2e", width=1)
+            self.canvas.create_oval(
+                px - pr,
+                py - pr,
+                px + pr,
+                py + pr,
+                fill="#ffffff" if hov else PORT_IN_COLOR,
+                outline="#1a1a2e",
+                width=1,
+            )
             if app.zoom > 0.55:
-                self.canvas.create_text(px + pr + 3, py, text=port,
-                                         fill=DIM_FG,
-                                         font=("Segoe UI", max(5, int(7 * app.zoom))),
-                                         anchor="w")
+                self.canvas.create_text(
+                    px + pr + 3,
+                    py,
+                    text=port,
+                    fill=DIM_FG,
+                    font=("Segoe UI", max(5, int(7 * app.zoom))),
+                    anchor="w",
+                )
         for port in tool.outs:
             px, py = self.port_screen(app, node, port, "out")
             hov = app.hover_port == (node.id, port, "out")
-            self.canvas.create_oval(px - pr, py - pr, px + pr, py + pr,
-                                     fill="#ffffff" if hov else PORT_OUT_COLOR,
-                                     outline="#1a1a2e", width=1)
+            self.canvas.create_oval(
+                px - pr,
+                py - pr,
+                px + pr,
+                py + pr,
+                fill="#ffffff" if hov else PORT_OUT_COLOR,
+                outline="#1a1a2e",
+                width=1,
+            )
             if app.zoom > 0.55:
-                self.canvas.create_text(px - pr - 3, py, text=port,
-                                         fill=DIM_FG,
-                                         font=("Segoe UI", max(5, int(7 * app.zoom))),
-                                         anchor="e")
+                self.canvas.create_text(
+                    px - pr - 3,
+                    py,
+                    text=port,
+                    fill=DIM_FG,
+                    font=("Segoe UI", max(5, int(7 * app.zoom))),
+                    anchor="e",
+                )
 
     def _draw_wire(self, app) -> None:
-        sx, sy = self.port_screen(app, app.wire_start_node,
-                                   app.wire_start_port, app.wire_start_dir)
+        sx, sy = self.port_screen(app, app.wire_start_node, app.wire_start_port, app.wire_start_dir)
         tx, ty = app.wire_pos
         ctrl = max(50 * app.zoom, abs(tx - sx) * 0.5)
         if app.wire_start_dir == "out":
@@ -312,7 +377,11 @@ class Renderer:
                 if nx <= sx <= nx + nw and ny <= sy <= ny + th:
                     return (node, "title", None)
                 # Body
-                if not node.params.get("collapsed") and nx <= sx <= nx + nw and ny + th <= sy <= ny + nh:
+                if (
+                    not node.params.get("collapsed")
+                    and nx <= sx <= nx + nw
+                    and ny + th <= sy <= ny + nh
+                ):
                     return (node, "body", None)
                 continue
 
@@ -346,7 +415,6 @@ def _hidden_ids(app) -> set:
             for other in app.nodes:
                 if other.id == node.id or other.kind == "container":
                     continue
-                if (node.x <= other.x <= node.x + w and
-                        node.y <= other.y <= node.y + h):
+                if node.x <= other.x <= node.x + w and node.y <= other.y <= node.y + h:
                     hidden.add(other.id)
     return hidden
