@@ -286,9 +286,7 @@ class UniqueDuplicate(BaseTool):
         df = inputs.get("data")
         if df is None:
             raise ValueError("No input")
-        keys = params.get("key_columns", [])
-        if isinstance(keys, str):
-            keys = [c.strip() for c in keys.split(",") if c.strip()]
+        keys = self._normalize_columns(params.get("key_columns"))
         subset = keys if keys else None
         keep = params.get("keep", "first")
         keep_val = keep if keep in ("first", "last") else False

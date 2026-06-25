@@ -64,9 +64,7 @@ class SelectColumns(BaseTool):
         df = inputs.get("data")
         if df is None:
             raise ValueError("No input")
-        cols = params.get("columns", [])
-        if isinstance(cols, str):
-            cols = [c.strip() for c in cols.split(",") if c.strip()]
+        cols = self._normalize_columns(params.get("columns"))
         if not cols:
             return {"data": df}
         missing = [c for c in cols if c not in df.columns]
@@ -77,9 +75,7 @@ class SelectColumns(BaseTool):
 
     def to_code(self, params, input_vars, output_var, connected_outs=None):
         iv = input_vars[0] if input_vars else "df"
-        cols = params.get("columns", [])
-        if isinstance(cols, str):
-            cols = [c.strip() for c in cols.split(",") if c.strip()]
+        cols = self._normalize_columns(params.get("columns"))
         return [f"{output_var} = {iv}[{cols!r}]"]
 
     def subtitle(self, params):
@@ -733,9 +729,7 @@ class Cleansing(BaseTool):
         if df is None:
             raise ValueError("No input")
         df = df.copy()
-        cols = params.get("columns", [])
-        if isinstance(cols, str):
-            cols = [c.strip() for c in cols.split(",") if c.strip()]
+        cols = self._normalize_columns(params.get("columns"))
         if not cols:
             cols = list(df.select_dtypes(include="object").columns)
         for col in cols:

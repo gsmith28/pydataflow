@@ -35,9 +35,7 @@ class Summarize(BaseTool):
         if scope == "numeric":
             result = df.describe(include="number", percentiles=pcts)
         elif scope == "specific":
-            cols = params.get("columns", [])
-            if isinstance(cols, str):
-                cols = [c.strip() for c in cols.split(",") if c.strip()]
+            cols = self._normalize_columns(params.get("columns"))
             result = df[cols].describe(percentiles=pcts) if cols else df.describe(percentiles=pcts)
         else:
             result = df.describe(include="all", percentiles=pcts)
@@ -99,9 +97,7 @@ class GroupBy(BaseTool):
         df = inputs.get("data")
         if df is None:
             raise ValueError("No input")
-        group_cols = params.get("group_cols", [])
-        if isinstance(group_cols, str):
-            group_cols = [c.strip() for c in group_cols.split(",") if c.strip()]
+        group_cols = self._normalize_columns(params.get("group_cols"))
         if not group_cols:
             raise ValueError("No group columns specified")
         aggs = params.get("aggs", [])
@@ -130,9 +126,7 @@ class GroupBy(BaseTool):
 
     def to_code(self, params, input_vars, output_var, connected_outs=None):
         iv = input_vars[0] if input_vars else "df"
-        group_cols = params.get("group_cols", [])
-        if isinstance(group_cols, str):
-            group_cols = [c.strip() for c in group_cols.split(",") if c.strip()]
+        group_cols = self._normalize_columns(params.get("group_cols"))
         aggs = params.get("aggs", [])
         if not aggs:
             return [f"{output_var} = {iv}.groupby({group_cols!r}).size().reset_index(name='count')"]
@@ -240,12 +234,8 @@ class Unpivot(BaseTool):
         df = inputs.get("data")
         if df is None:
             raise ValueError("No input")
-        id_cols = params.get("id_cols", [])
-        if isinstance(id_cols, str):
-            id_cols = [c.strip() for c in id_cols.split(",") if c.strip()]
-        val_cols = params.get("value_cols", [])
-        if isinstance(val_cols, str):
-            val_cols = [c.strip() for c in val_cols.split(",") if c.strip()]
+        id_cols = self._normalize_columns(params.get("id_cols"))
+        val_cols = self._normalize_columns(params.get("value_cols"))
         var_name = params.get("var_name") or "variable"
         value_name = params.get("value_name") or "value"
         result = pd.melt(

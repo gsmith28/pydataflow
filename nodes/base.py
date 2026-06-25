@@ -88,6 +88,21 @@ class BaseTool:
         """Return a short summary string shown below the node title on the canvas."""
         return ""
 
+    # --- param helpers (use inside execute / to_code) -----------------------
+
+    @staticmethod
+    def _normalize_columns(value: object) -> list[str]:
+        """Coerce a column-list param to a list of column names.
+
+        Accepts a list (copied), a comma-separated string, or None. Empty/
+        whitespace entries in a string are dropped.
+        """
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [c.strip() for c in value.split(",") if c.strip()]
+        return list(value)
+
     # --- config-widget helpers (use inside build_config) --------------------
 
     def _lbl(self, parent: tk.Widget, text: str, row: int) -> None:
@@ -228,9 +243,7 @@ class BaseTool:
         columns: list[str],
     ) -> tk.Listbox:
         cols = columns or []
-        current = params.get(key, [])
-        if isinstance(current, str):
-            current = [c.strip() for c in current.split(",") if c.strip()]
+        current = self._normalize_columns(params.get(key))
 
         self._lbl(parent, label, row)
         fr = ttk.Frame(parent)
