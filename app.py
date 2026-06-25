@@ -248,26 +248,50 @@ class FlowApp:
         inner.bind("<MouseWheel>", _wheel)
 
         tool_map = {t.node_type: t for t in all_tools()}
+        collapsed = set(settings.get("palette_collapsed") or [])
         for cat_name, kinds in CATEGORIES:
+            is_collapsed = cat_name in collapsed
+
+            hdr = tk.Frame(inner, bg=PANEL_BG, cursor="hand2")
+            hdr.pack(fill="x", pady=(8, 0))
+            caret = tk.Label(
+                hdr,
+                text="▸" if is_collapsed else "▾",
+                bg=PANEL_BG,
+                fg=DIM_FG,
+                font=("Segoe UI", 7),
+                padx=4,
+            )
+            caret.pack(side="left")
             cat_lbl = tk.Label(
-                inner,
+                hdr,
                 text=cat_name.upper(),
                 bg=PANEL_BG,
                 fg=DIM_FG,
                 font=("Segoe UI", 7, "bold"),
                 anchor="w",
-                padx=6,
                 pady=4,
             )
-            cat_lbl.pack(fill="x", pady=(8, 0))
-            cat_lbl.bind("<MouseWheel>", _wheel)
+            cat_lbl.pack(side="left", fill="x", expand=True)
+
+            body = tk.Frame(inner, bg=PANEL_BG)
+            if not is_collapsed:
+                body.pack(fill="x")
+
+            def _toggle(e=None, name=cat_name, h=hdr, b=body, c=caret):
+                self._toggle_palette_section(name, h, b, c, _resize)
+
+            for widget in (hdr, caret, cat_lbl):
+                widget.bind("<Button-1>", _toggle)
+                widget.bind("<MouseWheel>", _wheel)
+
             for kind in kinds:
                 tool = tool_map.get(kind)
                 if not tool:
                     continue
                 color = TOOL_COLORS.get(kind, "#4a4a70")
 
-                row = tk.Frame(inner, bg=PANEL_BG, cursor="fleur")
+                row = tk.Frame(body, bg=PANEL_BG, cursor="fleur")
                 row.pack(fill="x", padx=4, pady=1)
                 indicator = tk.Frame(row, bg=color, width=4)
                 indicator.pack(side="left", fill="y")
@@ -299,6 +323,19 @@ class FlowApp:
                 row.bind("<Leave>", lambda e, r=row: r.configure(bg=PANEL_BG))
                 lbl.bind("<Enter>", lambda e, r=row: r.configure(bg="#333350"))
                 lbl.bind("<Leave>", lambda e, r=row: r.configure(bg=PANEL_BG))
+
+    def _toggle_palette_section(self, name, hdr, body, caret, relayout) -> None:
+        collapsed = set(settings.get("palette_collapsed") or [])
+        if body.winfo_ismapped():
+            body.pack_forget()
+            caret.configure(text="▸")
+            collapsed.add(name)
+        else:
+            body.pack(fill="x", after=hdr)
+            caret.configure(text="▾")
+            collapsed.discard(name)
+        settings.set("palette_collapsed", sorted(collapsed))
+        relayout()
 
     def _make_log_tab(self, nb: ttk.Notebook) -> tk.Text:
         frame = ttk.Frame(nb)
